@@ -22,7 +22,7 @@ class NotificationService {
       tz.setLocalLocation(tz.getLocation(name));
       await _plugin.initialize(
         settings: const InitializationSettings(
-          android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+          android: AndroidInitializationSettings('ic_stat_commit'),
           iOS: DarwinInitializationSettings(requestAlertPermission: false),
         ),
       );
@@ -74,5 +74,62 @@ class NotificationService {
       ),
       androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
     );
+  }
+
+  /// Ongoing countdown in the shade (native chronometer, no per-second updates from Dart)
+  /// plus a heads-up notification when the phase ends, even if the app was closed.
+  Future<void> showFocusRunning({required String title, required String body, required DateTime endsAt}) async {
+    if (!_ready) return;
+    await _plugin.show(
+      id: 2,
+      title: title,
+      body: body,
+      notificationDetails: NotificationDetails(
+        android: AndroidNotificationDetails(
+          'commit_focus',
+          'Focus timer',
+          channelDescription: 'Live countdown while a focus session is running',
+          importance: Importance.low,
+          priority: Priority.low,
+          ongoing: true,
+          autoCancel: false,
+          onlyAlertOnce: true,
+          playSound: false,
+          enableVibration: false,
+          category: AndroidNotificationCategory.progress,
+          showWhen: true,
+          usesChronometer: true,
+          chronometerCountDown: true,
+          when: endsAt.millisecondsSinceEpoch,
+        ),
+      ),
+    );
+    await _scheduleFocusEnd(endsAt, title: '$title is up', body: body);
+  }
+
+  Future<void> _scheduleFocusEnd(DateTime endsAt, {required String title, required String body}) async {
+    if (!endsAt.isAfter(DateTime.now())) return;
+    final details = const NotificationDetails(
+      android: AndroidNotificationDetails('commit_focus_done', 'Focus alerts',
+          channelDescription: 'Tells you when a focus block or break ends',
+          importance: Importance.high, priority: Priority.high),
+      iOS: DarwinNotificationDetails(),
+    );
+    final when = tz.TZDateTime.from(endsAt, tz.local);
+    Future<void> schedule(AndroidScheduleMode mode) => _plugin.zonedSchedule(
+        id: 3, title: title, body: body, scheduledDate: when, notificationDetails: details, androidScheduleMode: mode);
+    try {
+      await schedule(AndroidScheduleMode.exactAllowWhileIdle);
+    } catch (_) {
+      try {
+        await schedule(AndroidScheduleMode.inexactAllowWhileIdle);
+      } catch (_) {}
+    }
+  }
+
+  Future<void> cancelFocus() async {
+    if (!_ready) return;
+    await _plugin.cancel(id: 2);
+    await _plugin.cancel(id: 3);
   }
 }

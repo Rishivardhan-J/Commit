@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/brand/logo_mark.svg" width="120" alt="Commit logo"></p>
+
 # Commit — Commit code. Commit to goals.
 
 A local-first Flutter app that turns your day into a git commit: stage 1–3 skill-tagged tasks in the
@@ -37,3 +39,9 @@ hotfix streak repair, a scheduled evening reminder (re-planned on each open/comm
 Cloud sync/auth, friends & leaderboards, home-screen widgets, voice capture, more platforms
 (Codeforces, CodeChef…), Drift/SQLite storage (currently JSON in shared_preferences), iOS background sync.
 LeetCode uses an unofficial endpoint and may break; failures fall back to cached data.
+
+## Brand
+The mark is a "C" arc that ends in an amber commit node: a letterform, a progress ring and a git commit
+dot at once. Sources and exports live in `assets/brand/` (`icon_full`, adaptive `icon_foreground` /
+`icon_background`, `icon_monochrome` for Android 13 themed icons, `logo_wordmark.svg`).
+Regenerate platform icons with `dart run flutter_launcher_icons`.

@@ -6,6 +6,8 @@ int metricToday(AppState s, String metric, String today) {
   switch (metric) {
     case 'lc.solved':
       return s.snapshots['leetcode']?.activity[today] ?? 0;
+    case 'cf.solved':
+      return s.snapshots['codeforces']?.activity[today] ?? 0;
     case 'gh.commits':
       return s.snapshots['github']?.activity[today] ?? 0;
   }

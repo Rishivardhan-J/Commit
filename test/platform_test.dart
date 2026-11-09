@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:commit/platforms/codeforces_provider.dart';
 import 'package:commit/platforms/github_provider.dart';
 import 'package:commit/platforms/leetcode_provider.dart';
 import 'package:commit/platforms/platform_provider.dart';
@@ -75,5 +76,42 @@ void main() {
   test('github 404 maps to a friendly error', () async {
     final client = MockClient((_) async => http.Response('', 404));
     expect(GithubProvider(client).fetch('x'), throwsA(isA<PlatformException>()));
+  });
+
+  test('codeforces parses rating, distinct solves, tags and activity', () async {
+    final ts = DateTime(2026, 11, 9, 9).millisecondsSinceEpoch ~/ 1000;
+    Map<String, dynamic> sub(String v, int c, String i, List<String> tags) => {
+          'verdict': v,
+          'creationTimeSeconds': ts,
+          'problem': {'contestId': c, 'index': i, 'tags': tags},
+        };
+    final client = MockClient((r) async {
+      if (r.url.path.endsWith('user.info')) {
+        return http.Response(jsonEncode({'status': 'OK', 'result': [{'rating': 1450, 'maxRating': 1500}]}), 200);
+      }
+      return http.Response(
+          jsonEncode({
+            'status': 'OK',
+            'result': [
+              sub('OK', 1, 'A', ['dp', 'math']),
+              sub('OK', 1, 'A', ['dp', 'math']), // duplicate accept
+              sub('WRONG_ANSWER', 2, 'B', ['graphs']),
+              sub('OK', 3, 'C', ['graphs']),
+            ]
+          }),
+          200);
+    });
+    final snap = await CodeforcesProvider(client, now: () => now).fetch('tourist');
+    expect(snap.stats['solved'], 2);
+    expect(snap.stats['rating'], 1450);
+    expect(snap.breakdown['dp'], 1);
+    expect(snap.breakdown['graphs'], 1);
+    expect(snap.activity['2026-11-09'], 2);
+  });
+
+  test('codeforces unknown handle gives a friendly error', () async {
+    final client = MockClient((_) async => http.Response(
+        jsonEncode({'status': 'FAILED', 'comment': 'handles: User with handle zzz not found'}), 400));
+    expect(CodeforcesProvider(client).fetch('zzz'), throwsA(isA<PlatformException>()));
   });
 }

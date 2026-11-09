@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/commit_colors.dart';
 import '../../core/utils/day_key.dart';
@@ -7,6 +9,7 @@ import '../../core/widgets/toast.dart';
 import '../../core/widgets/widgets.dart';
 import '../../data/app_store.dart';
 import '../../data/models.dart';
+import '../../services/backup_service.dart';
 import '../../services/notification_service.dart';
 import '../vault/vault_screen.dart';
 
@@ -19,22 +22,68 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   late final gh = TextEditingController(text: ref.read(appProvider).githubUser);
   late final lc = TextEditingController(text: ref.read(appProvider).leetcodeUser);
+  late final cf = TextEditingController(text: ref.read(appProvider).codeforcesUser);
   bool syncing = false;
 
   @override
   void dispose() {
     gh.dispose();
     lc.dispose();
+    cf.dispose();
     super.dispose();
   }
 
   Future<void> _saveAccounts() async {
     final n = ref.read(appProvider.notifier);
-    n.updateSettings(githubUser: gh.text.trim(), leetcodeUser: lc.text.trim());
+    n.updateSettings(githubUser: gh.text.trim(), leetcodeUser: lc.text.trim(), codeforcesUser: cf.text.trim());
     setState(() => syncing = true);
     final report = await n.sync(force: true);
     if (mounted) setState(() => syncing = false);
     reportSync(report, manual: true);
+  }
+
+  Future<void> _export() async {
+    try {
+      final f = await BackupService.write(ref.read(appProvider), ref.read(clockProvider)());
+      await BackupService.share(f);
+      AppToast.show('Backup ready — save it somewhere safe', icon: Icons.cloud_done_rounded);
+    } catch (_) {
+      AppToast.show('Could not create the backup', kind: ToastKind.error);
+    }
+  }
+
+  Future<void> _import() async {
+    try {
+      final picked = await FilePicker.pickFile(type: FileType.custom, allowedExtensions: ['json']);
+      if (picked == null) return;
+      final path = picked.path;
+      if (path == null) throw const FormatException('Could not read that file.');
+      final preview = BackupService.parse(await File(path).readAsString());
+      if (!mounted) return;
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: const Text('Restore this backup?'),
+          content: Text('${preview.commits} committed days, ${preview.tasks} tasks, ${preview.vault} vault items and '
+              '${preview.friends} friends.\n\nThis replaces what is on this phone now.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
+            TextButton(onPressed: () => Navigator.pop(c, true), child: const Text('Restore')),
+          ],
+        ),
+      );
+      if (ok == true) {
+        ref.read(appProvider.notifier).replaceState(preview.state);
+        gh.text = preview.state.githubUser;
+        lc.text = preview.state.leetcodeUser;
+        cf.text = preview.state.codeforcesUser;
+        AppToast.show('Backup restored', icon: Icons.restore_rounded);
+      }
+    } on FormatException catch (e) {
+      AppToast.show(e.message, kind: ToastKind.error);
+    } catch (_) {
+      AppToast.show('Could not import that file', kind: ToastKind.error);
+    }
   }
 
   @override
@@ -56,6 +105,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             const SizedBox(height: 10),
             TextField(controller: lc, autocorrect: false, decoration: const InputDecoration(labelText: 'LeetCode username', prefixIcon: Icon(Icons.terminal))),
             _SyncStatus(state: s, id: 'leetcode', username: s.leetcodeUser),
+            const SizedBox(height: 10),
+            TextField(controller: cf, autocorrect: false, decoration: const InputDecoration(labelText: 'Codeforces handle', prefixIcon: Icon(Icons.bar_chart_rounded))),
+            _SyncStatus(state: s, id: 'codeforces', username: s.codeforcesUser),
             const SizedBox(height: 6),
             Text('Only public profile data is read. Commit never asks for a password.',
                 style: context.text.bodySmall?.copyWith(color: cc.textSecondary)),
@@ -137,7 +189,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         const SectionTitle('Data'),
         CCard(
           padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: ListTile(
+          child: Column(children: [
+            ListTile(
+              leading: const Icon(Icons.upload_rounded),
+              title: const Text('Export backup'),
+              subtitle: const Text('Save everything to a file — share it to Drive or email.'),
+              onTap: () => _export(),
+            ),
+            ListTile(
+              leading: const Icon(Icons.download_rounded),
+              title: const Text('Import backup'),
+              subtitle: const Text('Restore from a Commit backup file.'),
+              onTap: () => _import(),
+            ),
+            ListTile(
             title: Text('Reset all data', style: TextStyle(color: context.scheme.error)),
             subtitle: const Text('Deletes tasks, vault, streaks and XP from this device.'),
             onTap: () async {
@@ -158,6 +223,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               }
             },
           ),
+          ]),
         ),
       ]),
     );

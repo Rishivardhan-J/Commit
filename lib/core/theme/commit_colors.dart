@@ -60,6 +60,7 @@ class CommitColors extends ThemeExtension<CommitColors> {
         'idea' => idea,
         'project' => project,
         'hackathon' => hackathon,
+        'snippet' => info,
         _ => resource,
       };
 

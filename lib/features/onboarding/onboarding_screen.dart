@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/commit_colors.dart';
+import '../../core/widgets/commit_logo.dart';
 import '../../core/widgets/toast.dart';
 import '../../data/app_store.dart';
 import '../../data/models.dart';
@@ -29,10 +30,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   final name = TextEditingController();
   final gh = TextEditingController();
   final lc = TextEditingController();
+  final cf = TextEditingController();
   final task = TextEditingController();
   String? identity;
   final skills = <String>{};
-  String? ghMsg, lcMsg;
+  String? ghMsg, lcMsg, cfMsg;
   bool checking = false;
 
   @override
@@ -41,6 +43,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     name.dispose();
     gh.dispose();
     lc.dispose();
+    cf.dispose();
     task.dispose();
     super.dispose();
   }
@@ -58,7 +61,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     final n = ref.read(appProvider.notifier);
     setState(() {
       checking = true;
-      ghMsg = lcMsg = null;
+      ghMsg = lcMsg = cfMsg = null;
     });
     Future<String?> check(String platform, String user) async {
       if (user.trim().isEmpty) return null;
@@ -73,11 +76,12 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       }
     }
 
-    final r = await Future.wait([check('github', gh.text), check('leetcode', lc.text)]);
+    final r = await Future.wait([check('github', gh.text), check('leetcode', lc.text), check('codeforces', cf.text)]);
     if (!mounted) return;
     setState(() {
       ghMsg = r[0];
       lcMsg = r[1];
+      cfMsg = r[2];
       checking = false;
     });
     final ok = !(r.any((m) => m != null && m.startsWith('✗')));
@@ -93,6 +97,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       skills: focus,
       github: ghMsg?.startsWith('✓') == true ? gh.text.trim() : '',
       leetcode: lcMsg?.startsWith('✓') == true ? lc.text.trim() : '',
+      codeforces: cfMsg?.startsWith('✓') == true ? cf.text.trim() : '',
     );
     final title = task.text.trim();
     if (title.isNotEmpty) {
@@ -106,10 +111,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     final cc = context.cc;
-    Widget shell(String emoji, String title, String sub, Widget body, Widget action) => Padding(
+    Widget shell(String emoji, String title, String sub, Widget body, Widget action, {Widget? lead}) => Padding(
           padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(emoji, style: const TextStyle(fontSize: 40)),
+            lead ?? Text(emoji, style: const TextStyle(fontSize: 40)),
             const SizedBox(height: 12),
             Text(title, style: context.text.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
             const SizedBox(height: 6),
@@ -151,6 +156,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   'Every day is a commit. Your history is your proof. What should we call you?',
                   TextField(controller: name, textCapitalization: TextCapitalization.words, decoration: const InputDecoration(hintText: 'Your name'), onChanged: (_) => setState(() {})),
                   FilledButton(onPressed: name.text.trim().isEmpty ? null : next, child: const Text('Continue')),
+                  lead: const CommitLogo(size: 64),
                 ),
                 shell(
                   '🧬',
@@ -196,11 +202,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     const SizedBox(height: 12),
                     TextField(controller: lc, autocorrect: false, decoration: const InputDecoration(labelText: 'LeetCode username', prefixIcon: Icon(Icons.terminal))),
                     if (lcMsg != null) Padding(padding: const EdgeInsets.only(top: 6), child: Align(alignment: Alignment.centerLeft, child: Text(lcMsg!, style: TextStyle(color: lcMsg!.startsWith('✓') ? cc.success : context.scheme.error)))),
+                    const SizedBox(height: 12),
+                    TextField(controller: cf, autocorrect: false, decoration: const InputDecoration(labelText: 'Codeforces handle', prefixIcon: Icon(Icons.bar_chart_rounded))),
+                    if (cfMsg != null) Padding(padding: const EdgeInsets.only(top: 6), child: Align(alignment: Alignment.centerLeft, child: Text(cfMsg!, style: TextStyle(color: cfMsg!.startsWith('✓') ? cc.success : context.scheme.error)))),
                     const SizedBox(height: 8),
                     TextButton(onPressed: next, child: const Text('Skip for now')),
                   ]),
                   FilledButton(
-                    onPressed: checking ? null : (gh.text.trim().isEmpty && lc.text.trim().isEmpty ? next : _link),
+                    onPressed: checking ? null : (gh.text.trim().isEmpty && lc.text.trim().isEmpty && cf.text.trim().isEmpty ? next : _link),
                     child: Text(checking ? 'Checking…' : 'Link & continue'),
                   ),
                 ),

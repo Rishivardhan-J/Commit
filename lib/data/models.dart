@@ -12,7 +12,7 @@ extension TaskTypeX on TaskType {
       };
 }
 
-enum WalletKind { idea, hackathon, project, resource }
+enum WalletKind { idea, hackathon, project, resource, snippet }
 
 extension WalletKindX on WalletKind {
   String get label => switch (this) {
@@ -20,6 +20,7 @@ extension WalletKindX on WalletKind {
         WalletKind.hackathon => 'Hackathons',
         WalletKind.project => 'Projects',
         WalletKind.resource => 'Resources',
+        WalletKind.snippet => 'Snippets',
       };
 }
 
@@ -34,6 +35,7 @@ class AutoRule {
   String get label => switch (metric) {
         'lc.solved' => 'LeetCode: solve $target today',
         'gh.commits' => 'GitHub: $target commit${target == 1 ? '' : 's'} today',
+        'cf.solved' => 'Codeforces: solve $target today',
         _ => metric,
       };
 }
@@ -251,6 +253,122 @@ class PlatformSnapshot {
       );
 }
 
+/// One finished focus block: the "commit message" you wrote before starting and how it went.
+class FocusSession {
+  final String id, day, skill;
+  final String message;
+  final String outcome; // shipped | partly | notyet
+  final int minutes, interruptions, awaySec;
+  final String? taskId;
+  const FocusSession({
+    required this.id,
+    required this.day,
+    required this.skill,
+    required this.minutes,
+    this.message = '',
+    this.outcome = 'shipped',
+    this.interruptions = 0,
+    this.awaySec = 0,
+    this.taskId,
+  });
+
+  /// Short git-style hash shown in the log.
+  String get hash => id.replaceAll('-', '').substring(0, 7);
+
+  FocusSession copyWith({String? message, String? outcome}) => FocusSession(
+        id: id,
+        day: day,
+        skill: skill,
+        minutes: minutes,
+        message: message ?? this.message,
+        outcome: outcome ?? this.outcome,
+        interruptions: interruptions,
+        awaySec: awaySec,
+        taskId: taskId,
+      );
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'day': day,
+        'skill': skill,
+        'min': minutes,
+        'msg': message,
+        'out': outcome,
+        'int': interruptions,
+        'away': awaySec,
+        'task': taskId,
+      };
+
+  factory FocusSession.fromJson(Map<String, dynamic> j) => FocusSession(
+        id: j['id'],
+        day: j['day'],
+        skill: j['skill'] ?? 'General',
+        minutes: j['min'] ?? 0,
+        message: j['msg'] ?? '',
+        outcome: j['out'] ?? 'shipped',
+        interruptions: j['int'] ?? 0,
+        awaySec: j['away'] ?? 0,
+        taskId: j['task'],
+      );
+}
+
+/// A friend tracked by public usernames only; stats come from the same public APIs.
+class Friend {
+  final String id;
+  final String name;
+  final String github;
+  final String leetcode;
+  final String codeforces;
+  final Map<String, PlatformSnapshot> snapshots;
+  final DateTime? fetchedAt;
+  final String? error;
+  const Friend({
+    required this.id,
+    required this.name,
+    this.github = '',
+    this.leetcode = '',
+    this.codeforces = '',
+    this.snapshots = const {},
+    this.fetchedAt,
+    this.error,
+  });
+
+  Friend copyWith({Map<String, PlatformSnapshot>? snapshots, DateTime? fetchedAt, String? error, bool clearError = false}) => Friend(
+        id: id,
+        name: name,
+        github: github,
+        leetcode: leetcode,
+        codeforces: codeforces,
+        snapshots: snapshots ?? this.snapshots,
+        fetchedAt: fetchedAt ?? this.fetchedAt,
+        error: clearError ? null : (error ?? this.error),
+      );
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'gh': github,
+        'lc': leetcode,
+        'cf': codeforces,
+        'snaps': snapshots.map((k, v) => MapEntry(k, v.toJson())),
+        'at': fetchedAt?.toIso8601String(),
+        'err': error,
+      };
+  factory Friend.fromJson(Map<String, dynamic> j) => Friend(
+        id: j['id'],
+        name: j['name'],
+        github: j['gh'] ?? '',
+        leetcode: j['lc'] ?? '',
+        codeforces: j['cf'] ?? '',
+        snapshots: {
+          for (final e in (j['snaps'] as Map? ?? const {}).entries)
+            e.key as String: PlatformSnapshot.fromJson(Map<String, dynamic>.from(e.value)),
+        },
+        fetchedAt: j['at'] == null ? null : DateTime.parse(j['at']),
+        error: j['err'],
+      );
+}
+
 class AppState {
   final bool onboarded;
   final String name;
@@ -258,6 +376,7 @@ class AppState {
   final List<String> focusSkills;
   final String githubUser;
   final String leetcodeUser;
+  final String codeforcesUser;
   final String themeMode; // system | light | dark
   final bool notifications;
   final int reminderHour; // evening commit reminder
@@ -274,6 +393,9 @@ class AppState {
   final Map<String, String> syncErrors;
   final Map<String, int> focusMinutes; // skill -> total focused minutes
   final Map<String, int> focusByDay; // dayKey -> minutes
+  final List<Friend> friends;
+  final List<String> claimedChallenges; // "2026-W46:id"
+  final List<FocusSession> focusLog; // newest last, capped
 
   const AppState({
     this.onboarded = false,
@@ -282,6 +404,7 @@ class AppState {
     this.focusSkills = const [],
     this.githubUser = '',
     this.leetcodeUser = '',
+    this.codeforcesUser = '',
     this.themeMode = 'system',
     this.notifications = true,
     this.reminderHour = 21,
@@ -298,6 +421,9 @@ class AppState {
     this.syncErrors = const {},
     this.focusMinutes = const {},
     this.focusByDay = const {},
+    this.friends = const [],
+    this.claimedChallenges = const [],
+    this.focusLog = const [],
   });
 
   int get totalXp =>
@@ -310,6 +436,7 @@ class AppState {
     List<String>? focusSkills,
     String? githubUser,
     String? leetcodeUser,
+    String? codeforcesUser,
     String? themeMode,
     bool? notifications,
     int? reminderHour,
@@ -326,6 +453,9 @@ class AppState {
     Map<String, String>? syncErrors,
     Map<String, int>? focusMinutes,
     Map<String, int>? focusByDay,
+    List<Friend>? friends,
+    List<String>? claimedChallenges,
+    List<FocusSession>? focusLog,
   }) =>
       AppState(
         onboarded: onboarded ?? this.onboarded,
@@ -334,6 +464,7 @@ class AppState {
         focusSkills: focusSkills ?? this.focusSkills,
         githubUser: githubUser ?? this.githubUser,
         leetcodeUser: leetcodeUser ?? this.leetcodeUser,
+        codeforcesUser: codeforcesUser ?? this.codeforcesUser,
         themeMode: themeMode ?? this.themeMode,
         notifications: notifications ?? this.notifications,
         reminderHour: reminderHour ?? this.reminderHour,
@@ -350,6 +481,9 @@ class AppState {
         syncErrors: syncErrors ?? this.syncErrors,
         focusMinutes: focusMinutes ?? this.focusMinutes,
         focusByDay: focusByDay ?? this.focusByDay,
+        friends: friends ?? this.friends,
+        claimedChallenges: claimedChallenges ?? this.claimedChallenges,
+        focusLog: focusLog ?? this.focusLog,
       );
 
   Map<String, dynamic> toJson() => {
@@ -359,6 +493,7 @@ class AppState {
         'focus': focusSkills,
         'gh': githubUser,
         'lc': leetcodeUser,
+        'cf': codeforcesUser,
         'theme': themeMode,
         'notif': notifications,
         'remind': reminderHour,
@@ -374,6 +509,10 @@ class AppState {
         'snaps': snapshots.map((k, v) => MapEntry(k, v.toJson())),
         'focusMin': focusMinutes,
         'focusDay': focusByDay,
+        'friends': friends.map((e) => e.toJson()).toList(),
+        'claimed': claimedChallenges,
+        'flog': focusLog.map((e) => e.toJson()).toList(),
+        'v': 2,
       };
 
   factory AppState.fromJson(Map<String, dynamic> j) => AppState(
@@ -383,6 +522,7 @@ class AppState {
         focusSkills: List<String>.from(j['focus'] ?? const []),
         githubUser: j['gh'] ?? '',
         leetcodeUser: j['lc'] ?? '',
+        codeforcesUser: j['cf'] ?? '',
         themeMode: j['theme'] ?? 'system',
         notifications: j['notif'] ?? true,
         reminderHour: j['remind'] ?? 21,
@@ -401,6 +541,9 @@ class AppState {
         },
         focusMinutes: Map<String, int>.from(j['focusMin'] ?? const {}),
         focusByDay: Map<String, int>.from(j['focusDay'] ?? const {}),
+        friends: [for (final f in j['friends'] ?? const []) Friend.fromJson(Map<String, dynamic>.from(f))],
+        claimedChallenges: List<String>.from(j['claimed'] ?? const []),
+        focusLog: [for (final f in j['flog'] ?? const []) FocusSession.fromJson(Map<String, dynamic>.from(f))],
       );
 
   String encode() => jsonEncode(toJson());

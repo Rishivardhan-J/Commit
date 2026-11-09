@@ -1,16 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/commit_colors.dart';
+import '../../core/widgets/toast.dart';
+import '../../data/app_store.dart';
 import '../capture/capture_sheet.dart';
 
-class AppShell extends StatelessWidget {
+class AppShell extends ConsumerWidget {
   final StatefulNavigationShell shell;
   const AppShell({super.key, required this.shell});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final cs = context.scheme;
+    // Pay out weekly challenges the moment they complete, from anywhere in the app.
+    ref.listen(appProvider, (_, next) {
+      if (!next.onboarded) return;
+      final done = ref.read(appProvider.notifier).claimChallenges();
+      if (done.isNotEmpty) {
+        final xp = done.fold<int>(0, (a, c) => a + c.rewardXp);
+        AppToast.show('Challenge complete: ${done.first.title}${done.length > 1 ? ' +${done.length - 1} more' : ''} · +$xp xp', icon: Icons.emoji_events_rounded);
+      }
+    });
 
     Widget item(int i, IconData icon, IconData activeIcon, String label) => Expanded(
           child: _NavItem(

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/commit_colors.dart';
 import '../../core/utils/day_key.dart';
+import '../../core/widgets/polish.dart';
 import '../../core/widgets/sync_feedback.dart';
 import '../../core/widgets/toast.dart';
 import '../../core/widgets/widgets.dart';
@@ -50,6 +51,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final suggestions = buildSuggestions(s, today);
     final lc = s.snapshots['leetcode'];
     final gh = s.snapshots['github'];
+    final cfs = s.snapshots['codeforces'];
 
     // Merged weekly activity: real commits/tasks plus platform activity.
     final merged = <String, int>{};
@@ -57,6 +59,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     add({for (final c in s.commits.where((c) => !c.frozen)) c.day: c.tasks.clamp(1, 99)});
     if (gh != null) add(gh.activity);
     if (lc != null) add(lc.activity);
+    if (cfs != null) add(cfs.activity);
 
     final cta = _cta(context, ref, s, today, staged, doneCount, streak);
     final week = [for (var i = 6; i >= 0; i--) addDays(today, -i)];
@@ -68,7 +71,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           onRefresh: () async => reportSync(await ref.read(appProvider.notifier).sync(force: true), manual: true),
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-            children: [
+            children: _stagger(context, [
               Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -103,14 +106,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     Expanded(
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                         const Text('CODING SCORE', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.2)),
-                        Text('$score', style: AppTheme.mono(context, size: 44, weight: FontWeight.w800, color: cc.onAccent)),
+                        AnimatedCount(value: score, style: AppTheme.mono(context, size: 44, weight: FontWeight.w800, color: cc.onAccent)),
                       ]),
                     ),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(color: cc.onAccent.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(14)),
                       child: Column(children: [
-                        Text('🔥 ${streak.current}', style: AppTheme.mono(context, size: 20, weight: FontWeight.w800, color: cc.onAccent)),
+                        AnimatedCount(value: streak.current, prefix: '🔥 ', style: AppTheme.mono(context, size: 20, weight: FontWeight.w800, color: cc.onAccent)),
                         Text('day streak', style: TextStyle(fontSize: 11, color: cc.onAccent)),
                       ]),
                     ),
@@ -155,13 +158,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         Text(['M', 'T', 'W', 'T', 'F', 'S', 'S'][parseDayKey(d).weekday - 1],
                             style: context.text.labelSmall?.copyWith(color: cc.textSecondary)),
                         const SizedBox(height: 6),
-                        Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            color: s.restDays.contains(d) ? cc.info.withValues(alpha: 0.3) : cc.heatFor(merged[d] ?? 0),
-                            borderRadius: BorderRadius.circular(10),
-                            border: d == today ? Border.all(color: context.scheme.primary, width: 2) : null,
+                        Tooltip(
+                          message: '${merged[d] ?? 0} activities',
+                          child: Container(
+                            width: 36,
+                            height: 36,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: s.restDays.contains(d) ? cc.info.withValues(alpha: 0.3) : cc.heatFor(merged[d] ?? 0),
+                              borderRadius: BorderRadius.circular(10),
+                              border: d == today ? Border.all(color: context.scheme.primary, width: 2) : null,
+                            ),
+                            child: Text('${parseDayKey(d).day}',
+                                style: AppTheme.mono(context, size: 11, weight: FontWeight.w700,
+                                    color: (merged[d] ?? 0) >= 4 ? const Color(0xFF0B0F1A) : cc.textSecondary)),
                           ),
                         ),
                       ]),
@@ -196,7 +206,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 const SectionTitle('Incoming PR from future you'),
                 _SuggestionCard(suggestion: suggestions.first),
               ],
-              if (gh != null || lc != null) ...[
+              if (gh != null || lc != null || cfs != null) ...[
                 const SectionTitle('Platforms'),
                 Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   if (gh != null)
@@ -222,6 +232,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       ),
                     ),
                 ]),
+                if (cfs != null) ...[
+                  const SizedBox(height: 12),
+                  _PlatformCard(
+                    title: 'Codeforces',
+                    value: '${cfs.stats['solved'] ?? 0}',
+                    caption: 'solved${(cfs.stats['rating'] ?? 0) > 0 ? ' · rating ${cfs.stats['rating']}' : ''}',
+                    color: const Color(0xFF1F8ACB),
+                    error: s.syncErrors['codeforces'],
+                  ),
+                ],
               ] else ...[
                 const SectionTitle('Platforms'),
                 CCard(
@@ -238,7 +258,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
               ],
               if (now.weekday == DateTime.monday) _WeeklyRecap(today: today),
-            ],
+            ]),
           ),
         ),
       ),
@@ -286,6 +306,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 }
+
+/// Cascades the first screenful of blocks in; later blocks stay static so scrolling never replays.
+List<Widget> _stagger(BuildContext c, List<Widget> w) => [
+      for (var i = 0; i < w.length; i++) i < 9 ? w[i].staggerIn(c, i) : w[i],
+    ];
 
 class _SuggestionCard extends ConsumerWidget {
   final Suggestion suggestion;

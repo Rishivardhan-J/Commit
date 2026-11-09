@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_auth/local_auth.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/theme/commit_colors.dart';
 import '../../core/utils/day_key.dart';
 import '../../core/widgets/toast.dart';
@@ -132,7 +134,7 @@ class _WalletCard extends ConsumerWidget {
         onTap: () => showAddWallet(context, item.kind, existing: item),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            Pill(item.kind.name, color: color),
+            Pill(item.kind == WalletKind.snippet && (item.extra['lang'] ?? '').isNotEmpty ? 'snippet · ${item.extra['lang']}' : item.kind.name, color: color),
             const SizedBox(width: 6),
             if (item.kind == WalletKind.idea) Pill(item.status, color: cc.textSecondary),
             if (countdown != null) Pill(countdown, color: cc.warning, icon: Icons.timer_outlined),
@@ -149,7 +151,31 @@ class _WalletCard extends ConsumerWidget {
           ]),
           const SizedBox(height: 6),
           Text(item.title, style: context.text.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
-          if (item.body.isNotEmpty)
+          if (item.body.isNotEmpty && item.kind == WalletKind.snippet)
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(top: 8),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: cc.surfaceRaised, borderRadius: BorderRadius.circular(12)),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Expanded(
+                  child: Text(item.body,
+                      maxLines: 6,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTheme.mono(context, size: 12, weight: FontWeight.w500)),
+                ),
+                IconButton(
+                  tooltip: 'Copy snippet',
+                  visualDensity: VisualDensity.compact,
+                  icon: const Icon(Icons.copy_rounded, size: 18),
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: item.body));
+                    AppToast.show('Snippet copied', icon: Icons.copy_rounded);
+                  },
+                ),
+              ]),
+            )
+          else if (item.body.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 4),
               child: Text(item.body, maxLines: 3, overflow: TextOverflow.ellipsis, style: context.text.bodyMedium?.copyWith(color: cc.textSecondary)),
@@ -189,6 +215,7 @@ class _WalletFormState extends ConsumerState<_WalletForm> {
   late final link = TextEditingController(text: widget.existing?.extra['link']);
   late final start = TextEditingController(text: widget.existing?.extra['start']);
   late final team = TextEditingController(text: widget.existing?.extra['team']);
+  late final lang = TextEditingController(text: widget.existing?.extra['lang']);
   late String status = widget.existing?.status ?? 'raw';
 
   void save() {
@@ -207,6 +234,7 @@ class _WalletFormState extends ConsumerState<_WalletForm> {
         if (link.text.trim().isNotEmpty) 'link': link.text.trim(),
         if (start.text.trim().isNotEmpty) 'start': start.text.trim(),
         if (team.text.trim().isNotEmpty) 'team': team.text.trim(),
+        if (lang.text.trim().isNotEmpty) 'lang': lang.text.trim(),
       },
     ));
     Navigator.pop(context);
@@ -228,9 +256,21 @@ class _WalletFormState extends ConsumerState<_WalletForm> {
               WalletKind.hackathon => 'Hackathon name',
               WalletKind.project => 'Project name',
               WalletKind.resource => 'Resource title',
+              WalletKind.snippet => 'Snippet title',
             })),
             const SizedBox(height: 10),
-            TextField(controller: body, maxLines: 3, decoration: InputDecoration(hintText: kind == WalletKind.hackathon ? 'Theme / problem statement' : 'Description')),
+            if (kind == WalletKind.snippet) ...[
+              TextField(controller: lang, decoration: const InputDecoration(hintText: 'Language (dart, python, sql…)')),
+              const SizedBox(height: 10),
+              TextField(
+                controller: body,
+                maxLines: 8,
+                minLines: 4,
+                style: AppTheme.mono(context, size: 13, weight: FontWeight.w500),
+                decoration: const InputDecoration(hintText: 'Paste your code'),
+              ),
+            ] else
+              TextField(controller: body, maxLines: 3, decoration: InputDecoration(hintText: kind == WalletKind.hackathon ? 'Theme / problem statement' : 'Description')),
             if (kind == WalletKind.idea) ...[
               const SizedBox(height: 10),
               SegmentedButton<String>(
@@ -249,7 +289,7 @@ class _WalletFormState extends ConsumerState<_WalletForm> {
               const SizedBox(height: 10),
               TextField(controller: team, decoration: const InputDecoration(hintText: 'Team members')),
             ],
-            if (kind != WalletKind.idea) ...[
+            if (kind != WalletKind.idea && kind != WalletKind.snippet) ...[
               const SizedBox(height: 10),
               TextField(controller: link, keyboardType: TextInputType.url, decoration: const InputDecoration(hintText: 'Link (repo, submission, doc)')),
             ],

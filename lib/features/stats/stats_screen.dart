@@ -1,7 +1,9 @@
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/commit_colors.dart';
+import '../../core/utils/day_key.dart';
 import '../../core/widgets/widgets.dart';
 import '../../data/app_store.dart';
 import '../../engine/badge_engine.dart';
@@ -18,12 +20,14 @@ class StatsScreen extends ConsumerWidget {
     final streak = computeStreak(s, today);
     final gh = s.snapshots['github'];
     final lc = s.snapshots['leetcode'];
+    final cfs = s.snapshots['codeforces'];
 
     final merged = <String, int>{};
     void add(Map<String, int> m) => m.forEach((k, v) => merged[k] = (merged[k] ?? 0) + v);
     add({for (final c in s.commits.where((c) => !c.frozen)) c.day: c.tasks.clamp(1, 99)});
     if (gh != null) add(gh.activity);
     if (lc != null) add(lc.activity);
+    if (cfs != null) add(cfs.activity);
 
     Widget stat(String label, String value) => Expanded(
           child: Column(children: [
@@ -44,6 +48,8 @@ class StatsScreen extends ConsumerWidget {
             stat('days committed', '${s.commits.where((c) => !c.frozen).length}'),
           ]),
         ),
+        const SectionTitle('Trends'),
+        _Trends(merged: merged, today: today, focusByDay: s.focusByDay, focusMinutes: s.focusMinutes),
         const SectionTitle('Commit graph · all platforms'),
         CCard(child: SingleChildScrollView(scrollDirection: Axis.horizontal, reverse: true, child: Heatmap(activity: merged, today: today))),
         if (lc != null) ...[
@@ -58,6 +64,20 @@ class StatsScreen extends ConsumerWidget {
               ]),
               const SizedBox(height: 12),
               _TopicBars(data: lc.breakdown),
+            ]),
+          ),
+        ],
+        if (cfs != null) ...[
+          const SectionTitle('Codeforces'),
+          CCard(
+            child: Column(children: [
+              Row(children: [
+                stat('solved', '${cfs.stats['solved'] ?? 0}'),
+                stat('rating', '${cfs.stats['rating'] ?? 0}'),
+                stat('max rating', '${cfs.stats['maxRating'] ?? 0}'),
+              ]),
+              const SizedBox(height: 12),
+              _TopicBars(data: cfs.breakdown),
             ]),
           ),
         ],
@@ -156,5 +176,101 @@ class _TopicBars extends StatelessWidget {
           ]),
         ),
     ]);
+  }
+}
+
+class _Trends extends StatelessWidget {
+  final Map<String, int> merged, focusByDay, focusMinutes;
+  final String today;
+  const _Trends({required this.merged, required this.today, required this.focusByDay, required this.focusMinutes});
+
+  int _sum(Map<String, int> m, String from, String to) =>
+      m.entries.where((e) => e.key.compareTo(from) >= 0 && e.key.compareTo(to) <= 0).fold(0, (a, e) => a + e.value);
+
+  @override
+  Widget build(BuildContext context) {
+    final cc = context.cc;
+    final thisWeek = _sum(merged, addDays(today, -6), today);
+    final lastWeek = _sum(merged, addDays(today, -13), addDays(today, -7));
+    final String headline;
+    final Color color;
+    if (lastWeek == 0 && thisWeek == 0) {
+      headline = 'No activity yet — your first commit starts the trend';
+      color = cc.textSecondary;
+    } else if (lastWeek == 0) {
+      headline = '$thisWeek activities this week — a fresh start';
+      color = cc.success;
+    } else {
+      final pct = ((thisWeek - lastWeek) / lastWeek * 100).round();
+      headline = pct >= 0 ? 'You did $pct% more than last week' : 'Activity is ${-pct}% below last week';
+      color = pct >= 0 ? cc.success : cc.warning;
+    }
+    final days = [for (var i = 6; i >= 0; i--) addDays(today, -i)];
+    final maxY = days.map((d) => merged[d] ?? 0).fold<int>(1, (a, b) => a > b ? a : b).toDouble();
+    final focusTop = (focusMinutes.entries.toList()..sort((a, b) => b.value.compareTo(a.value))).take(5).toList();
+    final focusToday = focusByDay[today] ?? 0;
+
+    return CCard(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(headline, style: context.text.titleSmall?.copyWith(fontWeight: FontWeight.w700, color: color)),
+        Text('This week $thisWeek · last week $lastWeek', style: context.text.bodySmall?.copyWith(color: cc.textSecondary)),
+        const SizedBox(height: 14),
+        SizedBox(
+          height: 130,
+          child: BarChart(BarChartData(
+            maxY: maxY * 1.25,
+            gridData: const FlGridData(show: false),
+            borderData: FlBorderData(show: false),
+            barTouchData: BarTouchData(enabled: false),
+            titlesData: FlTitlesData(
+              leftTitles: const AxisTitles(),
+              topTitles: const AxisTitles(),
+              rightTitles: const AxisTitles(),
+              bottomTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  getTitlesWidget: (v, _) => Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Text(['M', 'T', 'W', 'T', 'F', 'S', 'S'][parseDayKey(days[v.toInt()]).weekday - 1],
+                        style: TextStyle(fontSize: 11, color: cc.textSecondary)),
+                  ),
+                ),
+              ),
+            ),
+            barGroups: [
+              for (var i = 0; i < 7; i++)
+                BarChartGroupData(x: i, barRods: [
+                  BarChartRodData(
+                    toY: (merged[days[i]] ?? 0).toDouble(),
+                    width: 18,
+                    borderRadius: BorderRadius.circular(6),
+                    color: i == 6 ? context.scheme.primary : context.scheme.primary.withValues(alpha: 0.45),
+                    backDrawRodData: BackgroundBarChartRodData(show: true, toY: maxY * 1.25, color: cc.surfaceRaised),
+                  ),
+                ]),
+            ],
+          )),
+        ),
+        if (focusTop.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          Text('Focus time by skill · $focusToday min today', style: context.text.labelLarge?.copyWith(color: cc.textSecondary)),
+          const SizedBox(height: 8),
+          for (final e in focusTop)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 3),
+              child: Row(children: [
+                SizedBox(width: 110, child: Text(e.key, overflow: TextOverflow.ellipsis, style: context.text.bodySmall)),
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(value: e.value / focusTop.first.value, minHeight: 8, color: cc.warning, backgroundColor: cc.surfaceRaised),
+                  ),
+                ),
+                SizedBox(width: 56, child: Text('${e.value}m', textAlign: TextAlign.right, style: AppTheme.mono(context, size: 12))),
+              ]),
+            ),
+        ],
+      ]),
+    );
   }
 }

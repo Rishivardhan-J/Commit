@@ -5,12 +5,15 @@ import 'package:uuid/uuid.dart';
 import '../core/utils/day_key.dart';
 import '../engine/autocomplete_engine.dart';
 import '../engine/badge_engine.dart';
+import '../engine/challenge_engine.dart';
 import '../engine/streak_engine.dart';
 import '../engine/xp_engine.dart';
+import '../platforms/codeforces_provider.dart';
 import '../platforms/github_provider.dart';
 import '../platforms/leetcode_provider.dart';
 import '../platforms/platform_provider.dart';
 import '../services/notification_service.dart';
+import '../services/widget_service.dart';
 import 'models.dart';
 
 const _prefsKey = 'commit_state_v1';
@@ -77,6 +80,7 @@ class AppNotifier extends Notifier<AppState> {
   void _set(AppState s) {
     state = s;
     _prefs.setString(_prefsKey, s.encode());
+    WidgetService.update(s, _today);
   }
 
   /// Re-plan tonight's single reminder from current state.
@@ -98,6 +102,7 @@ class AppNotifier extends Notifier<AppState> {
     required List<String> skills,
     String github = '',
     String leetcode = '',
+    String codeforces = '',
   }) =>
       _set(state.copyWith(
         onboarded: true,
@@ -106,6 +111,7 @@ class AppNotifier extends Notifier<AppState> {
         focusSkills: skills,
         githubUser: github,
         leetcodeUser: leetcode,
+        codeforcesUser: codeforces,
       ));
 
   void updateSettings({
@@ -117,6 +123,7 @@ class AppNotifier extends Notifier<AppState> {
     int? reminderHour,
     String? githubUser,
     String? leetcodeUser,
+    String? codeforcesUser,
   }) =>
       _set(state.copyWith(
         name: name,
@@ -127,6 +134,7 @@ class AppNotifier extends Notifier<AppState> {
         reminderHour: reminderHour,
         githubUser: githubUser,
         leetcodeUser: leetcodeUser,
+        codeforcesUser: codeforcesUser,
       ));
 
   void scheduleRestDay(String day) {
@@ -170,6 +178,8 @@ class AppNotifier extends Notifier<AppState> {
       _set(state.copyWith(tasks: [for (final t in state.tasks) t.id == id ? f(t) : t]));
 
   void stage(String id) => _updateTask(id, (t) => t.copyWith(stagedFor: _today));
+  /// Plan a task for a specific (future) day; it surfaces in Today when that morning arrives.
+  void stageFor(String id, String day) => _updateTask(id, (t) => t.copyWith(stagedFor: day));
   void unstage(String id) => _updateTask(id, (t) => t.copyWith(clearStaged: true));
   void toggleDone(String id, {bool fallback = false}) => _updateTask(id, (t) {
         if (t.done) return t.copyWith(done: false, doneViaFallback: false, auto: false, clearDone: true);
@@ -255,6 +265,19 @@ class AppNotifier extends Notifier<AppState> {
       wallet: [for (final w in state.wallet) w.id == id ? w.copyWith(status: status) : w]));
   void deleteWallet(String id) => _set(state.copyWith(wallet: state.wallet.where((w) => w.id != id).toList()));
 
+  /// Pays out any newly completed weekly challenges (bonus XP on 'General'). Returns them for feedback.
+  List<Challenge> claimChallenges() {
+    final today = _today;
+    final done = claimable(state, today);
+    if (done.isEmpty) return const [];
+    final xp = done.fold<int>(0, (a, c) => a + c.rewardXp);
+    _set(state.copyWith(
+      claimedChallenges: [...state.claimedChallenges, for (final c in done) claimKey(today, c.id)],
+      skillXp: {...state.skillXp, 'Challenges': (state.skillXp['Challenges'] ?? 0) + xp},
+    ));
+    return done;
+  }
+
   void _awardBadgesQuiet() {
     final nb = newBadges(state, _today);
     if (nb.isNotEmpty) _set(state.copyWith(badges: [...state.badges, ...nb]));
@@ -267,6 +290,7 @@ class AppNotifier extends Notifier<AppState> {
     final jobs = <(PlatformProvider, String, String)>[
       if (state.githubUser.isNotEmpty) (GithubProvider(client, now: clock), state.githubUser, 'GitHub'),
       if (state.leetcodeUser.isNotEmpty) (LeetcodeProvider(client, now: clock), state.leetcodeUser, 'LeetCode'),
+      if (state.codeforcesUser.isNotEmpty) (CodeforcesProvider(client, now: clock), state.codeforcesUser, 'Codeforces'),
     ];
     final results = await Future.wait(jobs.map((j) async {
       final (p, user, label) = j;
@@ -294,9 +318,12 @@ class AppNotifier extends Notifier<AppState> {
     return SyncReport(results, _autoComplete());
   }
 
-  String _summary(PlatformSnapshot s) => s.platform == 'github'
-      ? '${s.stats['repos'] ?? 0} repos · ${s.stats['weekCommits'] ?? 0} commits this week'
-      : '${s.stats['solved'] ?? 0} solved · ${s.stats['weekSolved'] ?? 0} this week';
+  String _summary(PlatformSnapshot s) => switch (s.platform) {
+        'github' => '${s.stats['repos'] ?? 0} repos · ${s.stats['weekCommits'] ?? 0} commits this week',
+        'codeforces' =>
+          '${s.stats['solved'] ?? 0} solved${(s.stats['rating'] ?? 0) > 0 ? ' · rating ${s.stats['rating']}' : ''}',
+        _ => '${s.stats['solved'] ?? 0} solved · ${s.stats['weekSolved'] ?? 0} this week',
+      };
 
   /// Ticks tasks that platform activity has satisfied; returns them for feedback.
   List<Task> _autoComplete() {
@@ -327,7 +354,11 @@ class AppNotifier extends Notifier<AppState> {
   Future<PlatformSnapshot> probe(String platform, String user) async {
     final client = ref.read(httpClientProvider);
     final clock = ref.read(clockProvider);
-    final p = platform == 'github' ? GithubProvider(client, now: clock) : LeetcodeProvider(client, now: clock);
+    final PlatformProvider p = switch (platform) {
+      'github' => GithubProvider(client, now: clock),
+      'codeforces' => CodeforcesProvider(client, now: clock),
+      _ => LeetcodeProvider(client, now: clock),
+    };
     return p.fetch(user);
   }
 
@@ -346,6 +377,65 @@ class AppNotifier extends Notifier<AppState> {
     ));
     return xp;
   }
+
+  static const focusLogCap = 200;
+
+  void addFocusSession(FocusSession f) {
+    final log = [...state.focusLog, f];
+    _set(state.copyWith(focusLog: log.length > focusLogCap ? log.sublist(log.length - focusLogCap) : log));
+  }
+
+  void updateFocusSession(String id, {String? message, String? outcome}) => _set(state.copyWith(
+        focusLog: [for (final f in state.focusLog) f.id == id ? f.copyWith(message: message, outcome: outcome) : f],
+      ));
+
+  // ---- friends (public usernames only, no backend) ----
+  Friend addFriend({required String name, String github = '', String leetcode = '', String codeforces = ''}) {
+    final f = Friend(id: _uuid.v4(), name: name, github: github, leetcode: leetcode, codeforces: codeforces);
+    _set(state.copyWith(friends: [...state.friends, f]));
+    return f;
+  }
+
+  void removeFriend(String id) => _set(state.copyWith(friends: state.friends.where((f) => f.id != id).toList()));
+  void restoreFriend(Friend f) {
+    if (state.friends.any((x) => x.id == f.id)) return;
+    _set(state.copyWith(friends: [...state.friends, f]));
+  }
+
+  /// Refreshes every friend's public stats. Each platform fails independently.
+  Future<int> refreshFriends({bool force = false}) async {
+    final client = ref.read(httpClientProvider);
+    final clock = ref.read(clockProvider);
+    var failures = 0;
+    await Future.wait(state.friends.map((f) async {
+      if (!force && f.fetchedAt != null && clock().difference(f.fetchedAt!).inMinutes < 30) return;
+      final jobs = <PlatformProvider, String>{
+        if (f.github.isNotEmpty) GithubProvider(client, now: clock): f.github,
+        if (f.leetcode.isNotEmpty) LeetcodeProvider(client, now: clock): f.leetcode,
+        if (f.codeforces.isNotEmpty) CodeforcesProvider(client, now: clock): f.codeforces,
+      };
+      final snaps = <String, PlatformSnapshot>{...f.snapshots};
+      String? err;
+      for (final e in jobs.entries) {
+        try {
+          snaps[e.key.id] = await e.key.fetch(e.value);
+        } on PlatformException catch (x) {
+          err ??= '${e.key.id}: ${x.message}';
+        } catch (_) {
+          err ??= 'Could not reach ${e.key.id}';
+        }
+      }
+      if (err != null) failures++;
+      _set(state.copyWith(friends: [
+        for (final x in state.friends)
+          x.id == f.id ? x.copyWith(snapshots: snaps, fetchedAt: clock(), error: err, clearError: err == null) : x,
+      ]));
+    }));
+    return failures;
+  }
+
+  /// Replace everything with a restored backup.
+  void replaceState(AppState s) => _set(s);
 
   void resetAll() => _set(AppState());
 }

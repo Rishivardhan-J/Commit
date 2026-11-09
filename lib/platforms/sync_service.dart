@@ -2,6 +2,7 @@ import 'package:http/http.dart' as http;
 import '../core/utils/day_key.dart';
 import '../data/models.dart';
 import '../engine/autocomplete_engine.dart';
+import 'codeforces_provider.dart';
 import 'github_provider.dart';
 import 'leetcode_provider.dart';
 import 'platform_provider.dart';
@@ -13,6 +14,7 @@ Future<AppState> syncState(AppState s, http.Client client, DateTime Function() n
   final jobs = <PlatformProvider, String>{
     if (s.githubUser.isNotEmpty) GithubProvider(client, now: now): s.githubUser,
     if (s.leetcodeUser.isNotEmpty) LeetcodeProvider(client, now: now): s.leetcodeUser,
+    if (s.codeforcesUser.isNotEmpty) CodeforcesProvider(client, now: now): s.codeforcesUser,
   };
   var out = s;
   for (final e in jobs.entries) {

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../data/app_store.dart';
 import '../../features/commit/commit_screen.dart';
 import '../../features/focus/focus_screen.dart';
+import '../../features/friends/friends_screen.dart';
 import '../../features/home/home_screen.dart';
 import '../../features/roadmap/roadmap_screen.dart';
 import '../../features/home/shell.dart';
@@ -55,6 +56,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         pageBuilder: (_, _) => const MaterialPage(fullscreenDialog: true, child: CommitScreen()),
       ),
       GoRoute(path: '/focus', pageBuilder: (_, st) => slideFadePage(st, const FocusScreen())),
+      GoRoute(path: '/friends', pageBuilder: (_, st) => slideFadePage(st, const FriendsScreen())),
       GoRoute(path: '/roadmaps', pageBuilder: (_, st) => slideFadePage(st, const RoadmapScreen())),
       GoRoute(path: '/stats', pageBuilder: (_, st) => slideFadePage(st, const StatsScreen())),
       GoRoute(path: '/settings', pageBuilder: (_, st) => slideFadePage(st, const SettingsScreen())),

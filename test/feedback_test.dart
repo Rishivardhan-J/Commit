@@ -3,7 +3,6 @@ import 'package:commit/app.dart';
 import 'package:commit/core/widgets/toast.dart';
 import 'package:commit/data/app_store.dart';
 import 'package:commit/data/models.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;

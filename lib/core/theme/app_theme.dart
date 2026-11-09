@@ -50,7 +50,8 @@ class AppTheme {
       ),
       cardTheme: CardThemeData(
         color: cs.surface,
-        elevation: 0,
+        elevation: b == Brightness.light ? 1.5 : 0,
+        shadowColor: const Color(0x260F172A),
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
@@ -60,8 +61,16 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: cc.surfaceRaised,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        // Underline-style (filled) borders keep a floating label inside the field;
+        // an outline border would draw it straddling the top edge.
+        border: UnderlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+        enabledBorder: UnderlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+        focusedBorder: UnderlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: cs.primary, width: 1.5),
+        ),
+        floatingLabelStyle: TextStyle(color: cs.primary, fontWeight: FontWeight.w600),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
@@ -76,6 +85,8 @@ class AppTheme {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
       bottomSheetTheme: BottomSheetThemeData(
+        showDragHandle: true,
+        dragHandleColor: cc.border,
         backgroundColor: cs.surface,
         shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       ),

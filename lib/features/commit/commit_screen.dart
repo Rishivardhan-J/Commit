@@ -1,10 +1,18 @@
+import 'dart:io';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/commit_colors.dart';
+import '../../core/widgets/commit_logo.dart';
+import '../../core/widgets/polish.dart';
+import '../../core/widgets/toast.dart';
 import '../../core/widgets/widgets.dart';
 import '../../data/app_store.dart';
 import '../../engine/badge_engine.dart';
@@ -106,57 +114,118 @@ class _CommitScreenState extends ConsumerState<CommitScreen> {
   }
 }
 
-class _Celebration extends StatelessWidget {
+class _Celebration extends ConsumerStatefulWidget {
   final CommitResult result;
   const _Celebration({required this.result});
+  @override
+  ConsumerState<_Celebration> createState() => _CelebrationState();
+}
+
+class _CelebrationState extends ConsumerState<_Celebration> {
+  final cardKey = GlobalKey();
+  bool sharing = false;
+
+  Future<void> _share() async {
+    setState(() => sharing = true);
+    try {
+      final boundary = cardKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
+      final image = await boundary.toImage(pixelRatio: 3);
+      final data = await image.toByteData(format: ui.ImageByteFormat.png);
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/commit-day-${widget.result.streak}.png');
+      await file.writeAsBytes(data!.buffer.asUint8List());
+      await SharePlus.instance.share(ShareParams(
+        files: [XFile(file.path, mimeType: 'image/png')],
+        text: 'Day ${widget.result.streak} committed on Commit 🔥',
+      ));
+    } catch (_) {
+      AppToast.show('Could not create the share image', kind: ToastKind.error);
+    } finally {
+      if (mounted) setState(() => sharing = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final result = widget.result;
     final cc = context.cc;
     final total = result.taskXp + result.bonus;
+    final name = ref.read(appProvider).name;
+    final big = result.critical || result.levelAfter > result.levelBefore || result.newBadges.isNotEmpty;
     return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Text(result.critical ? '⚡' : '🔥', style: const TextStyle(fontSize: 72))
-                .animate()
-                .scale(duration: 500.ms, curve: Curves.elasticOut),
-            const SizedBox(height: 12),
-            Text(result.critical ? 'Critical commit!' : 'Committed.',
-                style: context.text.headlineMedium?.copyWith(fontWeight: FontWeight.w800)),
-            if (result.critical)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text('2× bonus XP', style: TextStyle(color: cc.warning, fontWeight: FontWeight.w700)),
-              ),
-            const SizedBox(height: 20),
-            Text('+$total xp', style: AppTheme.mono(context, size: 40, weight: FontWeight.w800, color: cc.warning))
-                .animate()
-                .fadeIn(delay: 200.ms)
-                .slideY(begin: 0.3),
-            const SizedBox(height: 8),
-            Text('${result.streak}-day streak', style: context.text.titleMedium),
-            if (result.levelAfter > result.levelBefore)
-              Padding(
-                padding: const EdgeInsets.only(top: 16),
-                child: Pill('Level up → ${result.levelAfter}', color: context.scheme.primary, icon: Icons.arrow_upward_rounded),
-              ),
-            if (result.hotfixed)
-              const Padding(padding: EdgeInsets.only(top: 12), child: Text('🩹 Hotfix! Your double day repaired yesterday and saved the streak.', textAlign: TextAlign.center)),
-            if (result.stashEarned)
-              const Padding(padding: EdgeInsets.only(top: 12), child: Text('🧊 You earned a stash — it protects your streak if you miss a day.')),
-            for (final id in result.newBadges)
-              Padding(
-                padding: const EdgeInsets.only(top: 12),
-                child: Text('${badgeById(id)?.emoji} Badge: ${badgeById(id)?.name}',
-                    style: context.text.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
-              ).animate().fadeIn(delay: 500.ms),
-            const SizedBox(height: 32),
-            FilledButton(onPressed: () => context.pop(), child: const Text('Done')),
-          ]),
+      body: Stack(children: [
+        if (big)
+          Positioned.fill(
+            child: ConfettiBurst(colors: [cc.warning, context.scheme.primary, cc.gradientEnd, cc.success, Colors.white]),
+          ),
+        SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+              RepaintBoundary(
+                key: cardKey,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(28),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [context.scheme.primary, cc.gradientEnd],
+                    ),
+                  ),
+                  child: DefaultTextStyle.merge(
+                    style: TextStyle(color: cc.onAccent),
+                    child: Column(children: [
+                      const CommitLogo(size: 44),
+                      const SizedBox(height: 14),
+                      Text(result.critical ? '⚡ Critical commit' : 'Day committed', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+                      const SizedBox(height: 6),
+                      AnimatedCount(
+                        value: result.streak,
+                        style: AppTheme.mono(context, size: 64, weight: FontWeight.w800, color: cc.onAccent),
+                      ),
+                      const Text('day streak', style: TextStyle(fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 14),
+                      Text('+$total xp${name.isEmpty ? '' : ' · $name'}', style: const TextStyle(fontWeight: FontWeight.w700)),
+                    ]),
+                  ),
+                ),
+              ).animate().scale(begin: const Offset(0.9, 0.9), duration: 500.ms, curve: Curves.easeOutBack).fadeIn(duration: 300.ms),
+              const SizedBox(height: 16),
+              if (result.critical) Text('2× bonus XP', style: TextStyle(color: cc.warning, fontWeight: FontWeight.w800)),
+              if (result.levelAfter > result.levelBefore)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Pill('Level up → ${result.levelAfter}', color: context.scheme.primary, icon: Icons.arrow_upward_rounded),
+                ),
+              if (result.hotfixed)
+                const Padding(padding: EdgeInsets.only(top: 12), child: Text('🩹 Hotfix! Your double day repaired yesterday and saved the streak.', textAlign: TextAlign.center)),
+              if (result.stashEarned)
+                const Padding(padding: EdgeInsets.only(top: 12), child: Text('🧊 You earned a stash — it protects your streak if you miss a day.', textAlign: TextAlign.center)),
+              for (final id in result.newBadges)
+                Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: Text('${badgeById(id)?.emoji} Badge: ${badgeById(id)?.name}',
+                      style: context.text.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+                ).animate().fadeIn(delay: 500.ms),
+              const SizedBox(height: 28),
+              Row(children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: sharing ? null : _share,
+                    icon: const Icon(Icons.ios_share_rounded),
+                    label: Text(sharing ? 'Preparing…' : 'Share'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(child: FilledButton(onPressed: () => context.pop(), child: const Text('Done'))),
+              ]),
+            ]),
+          ),
         ),
-      ),
+      ]),
     );
   }
 }

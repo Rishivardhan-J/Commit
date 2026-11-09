@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:speech_to_text/speech_to_text.dart';
 import '../../core/theme/commit_colors.dart';
 import '../../core/widgets/toast.dart';
 import '../../data/app_store.dart';
@@ -35,9 +37,46 @@ class _CaptureSheetState extends ConsumerState<CaptureSheet> {
   String? skill;
   int difficulty = 1;
   bool stageToday = true;
+  final _stt = SpeechToText();
+  bool listening = false;
+  double _level = 0;
+
+  Future<void> _toggleMic() async {
+    if (listening) {
+      await _stt.stop();
+      if (mounted) setState(() => listening = false);
+      return;
+    }
+    final ok = await _stt.initialize(
+      onStatus: (st) {
+        if ((st == 'done' || st == 'notListening') && mounted) setState(() => listening = false);
+      },
+      onError: (_) {
+        if (mounted) setState(() => listening = false);
+      },
+    );
+    if (!ok) {
+      AppToast.show('Voice input isn\'t available — check the microphone permission', kind: ToastKind.warn, icon: Icons.mic_off_rounded);
+      return;
+    }
+    HapticFeedback.selectionClick();
+    setState(() => listening = true);
+    await _stt.listen(
+      onResult: (r) {
+        title.text = r.recognizedWords;
+        title.selection = TextSelection.collapsed(offset: title.text.length);
+        if (mounted) setState(() {});
+      },
+      onSoundLevelChange: (l) {
+        if (mounted) setState(() => _level = ((l + 2) / 12).clamp(0.0, 1.0));
+      },
+      listenOptions: SpeechListenOptions(listenFor: const Duration(seconds: 30), pauseFor: const Duration(seconds: 3)),
+    );
+  }
 
   @override
   void dispose() {
+    _stt.cancel();
     title.dispose();
     body.dispose();
     super.dispose();
@@ -88,7 +127,22 @@ class _CaptureSheetState extends ConsumerState<CaptureSheet> {
             autofocus: true,
             textInputAction: idea ? TextInputAction.next : TextInputAction.done,
             onSubmitted: (_) => idea ? null : save(),
-            decoration: InputDecoration(hintText: idea ? 'What is the idea?' : 'What will you ship?'),
+            decoration: InputDecoration(
+              hintText: listening ? 'Listening…' : (idea ? 'What is the idea?' : 'What will you ship?'),
+              suffixIcon: IconButton(
+                tooltip: listening ? 'Stop dictation' : 'Dictate',
+                onPressed: _toggleMic,
+                icon: AnimatedContainer(
+                  duration: const Duration(milliseconds: 120),
+                  padding: EdgeInsets.all(listening ? 4 + 6 * _level : 4),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: listening ? context.scheme.error.withValues(alpha: 0.18) : Colors.transparent,
+                  ),
+                  child: Icon(listening ? Icons.mic_rounded : Icons.mic_none_rounded, color: listening ? context.scheme.error : null),
+                ),
+              ),
+            ),
           ),
           if (idea) ...[
             const SizedBox(height: 10),

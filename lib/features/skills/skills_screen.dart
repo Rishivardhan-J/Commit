@@ -1,10 +1,12 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/commit_colors.dart';
 import '../../core/widgets/widgets.dart';
 import '../../data/app_store.dart';
+import '../../engine/challenge_engine.dart';
 import '../../engine/xp_engine.dart';
 
 class SkillsScreen extends ConsumerWidget {
@@ -17,6 +19,8 @@ class SkillsScreen extends ConsumerWidget {
     final names = {...s.focusSkills, ...s.skillXp.keys}.toList();
     names.sort((a, b) => (s.skillXp[b] ?? 0).compareTo(s.skillXp[a] ?? 0));
     final overall = levelFor(s.totalXp);
+    final today = ref.watch(todayProvider);
+    final challenges = weeklyChallenges(s, today);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Skills')),
@@ -37,6 +41,56 @@ class SkillsScreen extends ConsumerWidget {
             ),
           ]),
         ),
+        const SectionTitle('This week\'s challenges'),
+        CCard(
+          child: Column(children: [
+            for (final c in challenges)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Row(children: [
+                  Text(c.done ? '🏆' : c.emoji, style: const TextStyle(fontSize: 22)),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(c.title, style: context.text.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 6),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: LinearProgressIndicator(
+                          value: c.fraction,
+                          minHeight: 6,
+                          color: c.done ? cc.success : context.scheme.primary,
+                          backgroundColor: cc.surfaceRaised,
+                        ),
+                      ),
+                    ]),
+                  ),
+                  const SizedBox(width: 12),
+                  Text('${c.progress.clamp(0, c.target)}/${c.target}', style: AppTheme.mono(context, size: 12, color: cc.textSecondary)),
+                ]),
+              ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text('Bonus XP when completed · resets every Monday', style: context.text.bodySmall?.copyWith(color: cc.textSecondary)),
+            ),
+          ]),
+        ),
+        const SizedBox(height: 12),
+        CCard(
+          onTap: () => context.push('/friends'),
+          child: Row(children: [
+            const Text('🏁', style: TextStyle(fontSize: 26)),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Leaderboard', style: context.text.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+                Text(s.friends.isEmpty ? 'Add classmates and race them' : '${s.friends.length} friend${s.friends.length == 1 ? '' : 's'} · tap to see ranks',
+                    style: context.text.bodySmall?.copyWith(color: cc.textSecondary)),
+              ]),
+            ),
+            const Icon(Icons.chevron_right),
+          ]),
+        ),
         if (names.length >= 3) ...[
           const SectionTitle('Radar'),
           CCard(
@@ -51,7 +105,7 @@ class SkillsScreen extends ConsumerWidget {
                   gridBorderData: BorderSide(color: cc.border),
                   tickBorderData: BorderSide(color: cc.border),
                   titleTextStyle: TextStyle(color: cc.textSecondary, fontSize: 11),
-                  getTitle: (i, _) => RadarChartTitle(text: names.take(6).toList()[i]),
+                  getTitle: (i, _) => RadarChartTitle(text: _short(names.take(6).toList()[i])),
                   dataSets: [
                     RadarDataSet(
                       fillColor: context.scheme.primary.withValues(alpha: 0.25),
@@ -100,3 +154,5 @@ class SkillsScreen extends ConsumerWidget {
     );
   }
 }
+
+String _short(String s) => s.length <= 9 ? s : (s.contains(' ') ? s.split(' ').map((w) => w[0]).join().toUpperCase() : '${s.substring(0, 8)}…');
