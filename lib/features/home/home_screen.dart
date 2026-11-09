@@ -67,30 +67,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
             children: [
-              Row(children: [
+              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text('${_greeting(now.hour)}${s.name.isEmpty ? '' : ', ${s.name}'}',
-                        style: context.text.bodyMedium?.copyWith(color: cc.textSecondary)),
+                    Wrap(spacing: 8, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
+                      Text('${_greeting(now.hour)}${s.name.isEmpty ? '' : ', ${s.name}'}',
+                          style: context.text.bodyMedium?.copyWith(color: cc.textSecondary)),
+                      Pill('you ${versionString(s.totalXp, s.skillXp.values)}', color: cc.info),
+                    ]),
+                    const SizedBox(height: 2),
                     Text("Today's focus", style: context.text.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
                   ]),
                 ),
-                Flexible(child: Pill('you ${versionString(s.totalXp, s.skillXp.values)}', color: cc.info)),
-                IconButton(
-                  tooltip: 'Focus timer',
-                  icon: const Icon(Icons.timer_outlined),
-                  onPressed: () => context.push('/focus'),
-                ),
-                IconButton(
-                  tooltip: 'Stats and log',
-                  icon: const Icon(Icons.insights_rounded),
-                  onPressed: () => context.push('/stats'),
-                ),
-                IconButton(
-                  tooltip: 'Settings',
-                  icon: const Icon(Icons.settings_outlined),
-                  onPressed: () => context.push('/settings'),
-                ),
+                const SizedBox(width: 4),
+                for (final a in [
+                  ('Focus timer', Icons.timer_outlined, '/focus'),
+                  ('Stats and log', Icons.insights_rounded, '/stats'),
+                  ('Settings', Icons.settings_outlined, '/settings'),
+                ])
+                  IconButton(
+                    tooltip: a.$1,
+                    icon: Icon(a.$2),
+                    visualDensity: VisualDensity.compact,
+                    constraints: const BoxConstraints(minWidth: 40, minHeight: 44),
+                    padding: EdgeInsets.zero,
+                    onPressed: () => context.push(a.$3),
+                  ),
               ]),
               const SizedBox(height: 12),
               HeroCard(
