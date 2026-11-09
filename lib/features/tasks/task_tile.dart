@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/commit_colors.dart';
+import '../../core/widgets/toast.dart';
 import '../../core/widgets/widgets.dart';
 import '../../data/app_store.dart';
 import '../../data/models.dart';
@@ -30,21 +31,31 @@ class TaskTile extends ConsumerWidget {
         color: context.scheme.error.withValues(alpha: 0.15),
         child: Icon(Icons.delete_outline, color: context.scheme.error),
       ),
-      onDismissed: (_) => n.deleteTask(task.id),
+      onDismissed: (_) {
+        n.deleteTask(task.id);
+        AppToast.show('Task deleted', kind: ToastKind.info, icon: Icons.delete_outline_rounded,
+            actionLabel: 'Undo', onAction: () => n.restoreTask(task));
+      },
       child: InkWell(
         onTap: () {
           HapticFeedback.lightImpact();
+          final wasDone = task.done;
           n.toggleDone(task.id);
+          if (wasDone) {
+            AppToast.show('Marked as not done', kind: ToastKind.info, icon: Icons.undo_rounded);
+          } else {
+            final committed = s.commits.any((c) => c.day == today && !c.frozen);
+            AppToast.show('Done · +${task.xp} xp${committed ? '' : ' — commit tonight'}',
+                actionLabel: 'Undo', onAction: () => n.toggleDone(task.id));
+          }
         },
         onLongPress: done
             ? null
             : () {
                 HapticFeedback.selectionClick();
                 n.toggleDone(task.id, fallback: true);
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                  content: const Text('Minimum viable commit logged — streak safe ✓'),
-                  duration: const Duration(seconds: 2),
-                ));
+                AppToast.show('2-minute version logged · +${(task.xp / 2).round()} xp — streak safe',
+                    icon: Icons.bolt_rounded, actionLabel: 'Undo', onAction: () => n.toggleDone(task.id));
               },
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
@@ -90,7 +101,13 @@ class TaskTile extends ConsumerWidget {
               IconButton(
                 tooltip: task.stagedFor == null ? 'Stage for today' : 'Unstage',
                 icon: Icon(task.stagedFor == null ? Icons.add_circle_outline : Icons.remove_circle_outline),
-                onPressed: () => task.stagedFor == null ? n.stage(task.id) : n.unstage(task.id),
+                onPressed: () {
+                  final staging = task.stagedFor == null;
+                  staging ? n.stage(task.id) : n.unstage(task.id);
+                  AppToast.show(staging ? 'Staged for today' : 'Moved back to backlog',
+                      kind: staging ? ToastKind.success : ToastKind.info,
+                      icon: staging ? Icons.add_task_rounded : Icons.inbox_rounded);
+                },
               ),
           ]),
         ),

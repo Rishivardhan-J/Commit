@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/commit_colors.dart';
+import '../../core/widgets/toast.dart';
 import '../../data/app_store.dart';
 import '../../data/models.dart';
 import '../capture/capture_sheet.dart';
@@ -99,6 +100,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       n.toggleDone(t.id, fallback: false); // endowed progress: first change already staged and done
     }
     n.commitDay('initial commit');
+    AppToast.show('Initial commit made — day 1 of your streak starts now', icon: Icons.eco_rounded);
   }
 
   @override

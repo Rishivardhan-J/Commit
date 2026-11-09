@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/commit_colors.dart';
+import '../../core/widgets/toast.dart';
 import '../../core/widgets/widgets.dart';
 import '../../data/app_store.dart';
 import '../capture/capture_sheet.dart';
@@ -55,6 +56,7 @@ class _FocusScreenState extends ConsumerState<FocusScreen> {
       endsAt = null;
       finishedXp = xp;
     });
+    AppToast.show('Focus session logged · $spent min · +$xp $sk xp', icon: Icons.self_improvement_rounded);
   }
 
   /// Stop early: only whole minutes actually focused count.
@@ -65,6 +67,7 @@ class _FocusScreenState extends ConsumerState<FocusScreen> {
       _finish(spent);
     } else {
       setState(() => endsAt = null);
+      AppToast.show('Under a minute — nothing logged', kind: ToastKind.info, icon: Icons.timer_off_rounded);
     }
   }
 

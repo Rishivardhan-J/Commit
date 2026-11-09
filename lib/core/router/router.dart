@@ -14,6 +14,24 @@ import '../../features/stats/stats_screen.dart';
 import '../../features/tasks/tasks_screen.dart';
 import '../../features/vault/vault_screen.dart';
 
+/// Shared transition for pushed pages: short fade with a slight slide-in.
+CustomTransitionPage<void> slideFadePage(GoRouterState state, Widget child) => CustomTransitionPage<void>(
+      key: state.pageKey,
+      child: child,
+      transitionDuration: const Duration(milliseconds: 280),
+      reverseTransitionDuration: const Duration(milliseconds: 220),
+      transitionsBuilder: (context, animation, _, child) {
+        final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic, reverseCurve: Curves.easeInCubic);
+        return FadeTransition(
+          opacity: curved,
+          child: SlideTransition(
+            position: Tween(begin: const Offset(0.04, 0), end: Offset.zero).animate(curved),
+            child: child,
+          ),
+        );
+      },
+    );
+
 final routerProvider = Provider<GoRouter>((ref) {
   final onboarded = ref.read(appProvider).onboarded;
   final refresh = ValueNotifier(0);
@@ -36,12 +54,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/commit',
         pageBuilder: (_, _) => const MaterialPage(fullscreenDialog: true, child: CommitScreen()),
       ),
-      GoRoute(path: '/focus', builder: (_, _) => const FocusScreen()),
-      GoRoute(path: '/roadmaps', builder: (_, _) => const RoadmapScreen()),
-      GoRoute(path: '/stats', builder: (_, _) => const StatsScreen()),
-      GoRoute(path: '/settings', builder: (_, _) => const SettingsScreen()),
-      StatefulShellRoute.indexedStack(
+      GoRoute(path: '/focus', pageBuilder: (_, st) => slideFadePage(st, const FocusScreen())),
+      GoRoute(path: '/roadmaps', pageBuilder: (_, st) => slideFadePage(st, const RoadmapScreen())),
+      GoRoute(path: '/stats', pageBuilder: (_, st) => slideFadePage(st, const StatsScreen())),
+      GoRoute(path: '/settings', pageBuilder: (_, st) => slideFadePage(st, const SettingsScreen())),
+      StatefulShellRoute(
         builder: (_, _, shell) => AppShell(shell: shell),
+        navigatorContainerBuilder: (_, shell, children) =>
+            AnimatedBranchContainer(currentIndex: shell.currentIndex, children: children),
         branches: [
           StatefulShellBranch(routes: [GoRoute(path: '/home', builder: (_, _) => const HomeScreen())]),
           StatefulShellBranch(routes: [GoRoute(path: '/tasks', builder: (_, _) => const TasksScreen())]),

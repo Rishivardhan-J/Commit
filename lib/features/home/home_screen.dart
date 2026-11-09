@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/commit_colors.dart';
 import '../../core/utils/day_key.dart';
+import '../../core/widgets/sync_feedback.dart';
+import '../../core/widgets/toast.dart';
 import '../../core/widgets/widgets.dart';
 import '../../data/app_store.dart';
 import '../../data/models.dart';
@@ -26,7 +28,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     super.initState();
     Future.microtask(() {
       final n = ref.read(appProvider.notifier);
-      n.sync();
+      n.sync().then((r) => reportSync(r, manual: false));
       n.replanReminder();
     });
   }
@@ -63,7 +65,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return Scaffold(
       body: SafeArea(
         child: RefreshIndicator(
-          onRefresh: () => ref.read(appProvider.notifier).sync(force: true),
+          onRefresh: () async => reportSync(await ref.read(appProvider.notifier).sync(force: true), manual: true),
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
             children: [
@@ -306,21 +308,27 @@ class _SuggestionCard extends ConsumerWidget {
         Row(children: [
           Expanded(
             child: OutlinedButton(
-              onPressed: () => n.dismissSuggestion(suggestion.title),
+              onPressed: () {
+                n.dismissSuggestion(suggestion.title);
+                AppToast.show('Dismissed for today', kind: ToastKind.info, icon: Icons.close_rounded);
+              },
               child: const Text('Close'),
             ),
           ),
           const SizedBox(width: 10),
           Expanded(
             child: OutlinedButton(
-              onPressed: () => n.acceptSuggestion(
-                title: suggestion.title,
-                skill: suggestion.skill,
-                type: suggestion.type,
-                difficulty: suggestion.difficulty,
-                fallback: suggestion.fallback,
-                rule: suggestion.rule,
-              ),
+              onPressed: () {
+                n.acceptSuggestion(
+                  title: suggestion.title,
+                  skill: suggestion.skill,
+                  type: suggestion.type,
+                  difficulty: suggestion.difficulty,
+                  fallback: suggestion.fallback,
+                  rule: suggestion.rule,
+                );
+                AppToast.show('Merged — added to today\'s staging', icon: Icons.call_merge_rounded);
+              },
               child: const Text('Merge'),
             ),
           ),

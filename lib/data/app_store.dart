@@ -41,6 +41,22 @@ class CommitResult {
       this.levelBefore, this.levelAfter, this.stashEarned, {this.hotfixed = false});
 }
 
+class PlatformResult {
+  final String id, label, message;
+  final bool ok;
+  final bool skipped; // served from a fresh cache, no network call
+  const PlatformResult(this.id, this.label, {required this.ok, required this.message, this.skipped = false});
+}
+
+class SyncReport {
+  final List<PlatformResult> results;
+  final List<Task> autoCompleted;
+  const SyncReport(this.results, this.autoCompleted);
+  bool get noAccounts => results.isEmpty;
+  bool get anyFailed => results.any((r) => !r.ok);
+  bool get allOk => results.isNotEmpty && !anyFailed;
+}
+
 class AppNotifier extends Notifier<AppState> {
   SharedPreferences get _prefs => ref.read(prefsProvider);
   String get _today => dayKey(ref.read(clockProvider)());
@@ -245,19 +261,19 @@ class AppNotifier extends Notifier<AppState> {
   }
 
   // ---- platform sync ----
-  Future<void> sync({bool force = false}) async {
+  Future<SyncReport> sync({bool force = false}) async {
     final client = ref.read(httpClientProvider);
     final clock = ref.read(clockProvider);
-    final jobs = <(PlatformProvider, String)>[
-      if (state.githubUser.isNotEmpty) (GithubProvider(client, now: clock), state.githubUser),
-      if (state.leetcodeUser.isNotEmpty) (LeetcodeProvider(client, now: clock), state.leetcodeUser),
+    final jobs = <(PlatformProvider, String, String)>[
+      if (state.githubUser.isNotEmpty) (GithubProvider(client, now: clock), state.githubUser, 'GitHub'),
+      if (state.leetcodeUser.isNotEmpty) (LeetcodeProvider(client, now: clock), state.leetcodeUser, 'LeetCode'),
     ];
-    await Future.wait(jobs.map((j) async {
-      final (p, user) = j;
+    final results = await Future.wait(jobs.map((j) async {
+      final (p, user, label) = j;
       final cached = state.snapshots[p.id];
       if (!force && cached != null && cached.username == user &&
           clock().difference(cached.fetchedAt).inMinutes < 30) {
-        return;
+        return PlatformResult(p.id, label, ok: true, skipped: true, message: _summary(cached));
       }
       try {
         final snap = await p.fetch(user);
@@ -265,25 +281,46 @@ class AppNotifier extends Notifier<AppState> {
           snapshots: {...state.snapshots, p.id: snap},
           syncErrors: {...state.syncErrors}..remove(p.id),
         ));
+        return PlatformResult(p.id, label, ok: true, message: _summary(snap));
       } on PlatformException catch (e) {
         _set(state.copyWith(syncErrors: {...state.syncErrors, p.id: e.message}));
+        return PlatformResult(p.id, label, ok: false, message: e.message);
       } catch (_) {
-        _set(state.copyWith(syncErrors: {...state.syncErrors, p.id: 'Could not reach ${p.id}'}));
+        final msg = 'Could not reach $label';
+        _set(state.copyWith(syncErrors: {...state.syncErrors, p.id: msg}));
+        return PlatformResult(p.id, label, ok: false, message: msg);
       }
     }));
-    _autoComplete();
+    return SyncReport(results, _autoComplete());
   }
 
-  void _autoComplete() {
+  String _summary(PlatformSnapshot s) => s.platform == 'github'
+      ? '${s.stats['repos'] ?? 0} repos · ${s.stats['weekCommits'] ?? 0} commits this week'
+      : '${s.stats['solved'] ?? 0} solved · ${s.stats['weekSolved'] ?? 0} this week';
+
+  /// Ticks tasks that platform activity has satisfied; returns them for feedback.
+  List<Task> _autoComplete() {
     final today = _today;
     final hits = satisfiedTasks(state, today);
-    if (hits.isEmpty) return;
+    if (hits.isEmpty) return const [];
     final ids = hits.map((t) => t.id).toSet();
     _set(state.copyWith(tasks: [
       for (final t in state.tasks)
         ids.contains(t.id) ? t.copyWith(done: true, auto: true, doneDay: today) : t,
     ]));
     _awardBadgesQuiet();
+    return hits;
+  }
+
+  /// Undo support for swipe-deletes.
+  void restoreTask(Task t) {
+    if (state.tasks.any((x) => x.id == t.id)) return;
+    _set(state.copyWith(tasks: [...state.tasks, t]));
+  }
+
+  void restoreWallet(WalletItem w) {
+    if (state.wallet.any((x) => x.id == w.id)) return;
+    _set(state.copyWith(wallet: [w, ...state.wallet]));
   }
 
   /// Validate a username before onboarding finishes.

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/commit_colors.dart';
+import '../../core/widgets/toast.dart';
 import '../../data/app_store.dart';
 import '../../data/models.dart';
 
@@ -59,12 +59,11 @@ class _CaptureSheetState extends ConsumerState<CaptureSheet> {
         stageToday: stageToday,
       );
     }
-    HapticFeedback.lightImpact();
     Navigator.pop(context);
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(idea ? 'Idea saved to your vault 💡' : stageToday ? 'Staged for today' : 'Task added'),
-      duration: const Duration(seconds: 2),
-    ));
+    AppToast.show(
+      idea ? 'Idea saved to your vault' : stageToday ? 'Staged for today · ${difficulty * 10} xp on offer' : 'Task added to backlog',
+      icon: idea ? Icons.lightbulb_rounded : Icons.add_task_rounded,
+    );
   }
 
   @override

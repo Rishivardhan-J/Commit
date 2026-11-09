@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/commit_colors.dart';
+import '../../core/widgets/toast.dart';
 import '../../core/widgets/widgets.dart';
 import '../../data/app_store.dart';
 import '../../data/models.dart';
@@ -115,9 +116,9 @@ class RoadmapScreen extends ConsumerWidget {
                           n.addTask(title: s.title, skill: s.skill, type: s.type, difficulty: s.difficulty, rule: s.rule, stageToday: false);
                           added++;
                         }
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                          content: Text(added == 0 ? 'Week ${w + 1} is already in your backlog' : 'Added $added tasks to your backlog'),
-                        ));
+                        added == 0
+                            ? AppToast.show('Week ${w + 1} is already in your backlog', kind: ToastKind.info)
+                            : AppToast.show('Added $added tasks from week ${w + 1} to your backlog', icon: Icons.map_rounded);
                         if (added > 0) context.go('/tasks');
                       },
                       child: Text('Add week ${w + 1}'),

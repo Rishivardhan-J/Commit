@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_auth/local_auth.dart';
 import '../../core/theme/commit_colors.dart';
 import '../../core/utils/day_key.dart';
+import '../../core/widgets/toast.dart';
 import '../../core/widgets/widgets.dart';
 import '../../data/app_store.dart';
 import '../../data/models.dart';
@@ -122,7 +123,11 @@ class _WalletCard extends ConsumerWidget {
         decoration: BoxDecoration(color: context.scheme.error.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(16)),
         child: Icon(Icons.delete_outline, color: context.scheme.error),
       ),
-      onDismissed: (_) => n.deleteWallet(item.id),
+      onDismissed: (_) {
+        n.deleteWallet(item.id);
+        AppToast.show('${item.kind.name[0].toUpperCase()}${item.kind.name.substring(1)} deleted',
+            kind: ToastKind.info, icon: Icons.delete_outline_rounded, actionLabel: 'Undo', onAction: () => n.restoreWallet(item));
+      },
       child: CCard(
         onTap: () => showAddWallet(context, item.kind, existing: item),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -136,7 +141,10 @@ class _WalletCard extends ConsumerWidget {
               tooltip: item.pinned ? 'Unpin' : 'Pin',
               visualDensity: VisualDensity.compact,
               icon: Icon(item.pinned ? Icons.push_pin : Icons.push_pin_outlined, size: 20),
-              onPressed: () => n.togglePin(item.id),
+              onPressed: () {
+                n.togglePin(item.id);
+                AppToast.show(item.pinned ? 'Unpinned' : 'Pinned to top', kind: ToastKind.info, icon: Icons.push_pin_rounded);
+              },
             ),
           ]),
           const SizedBox(height: 6),
@@ -202,6 +210,7 @@ class _WalletFormState extends ConsumerState<_WalletForm> {
       },
     ));
     Navigator.pop(context);
+    AppToast.show(widget.existing != null ? 'Changes saved' : 'Saved to vault', icon: Icons.lock_rounded);
   }
 
   @override

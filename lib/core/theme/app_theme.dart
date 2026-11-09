@@ -82,6 +82,9 @@ class AppTheme {
     );
   }
 
+  static TextStyle bodyOn(BuildContext context) =>
+      Theme.of(context).textTheme.bodyMedium!.copyWith(fontWeight: FontWeight.w600);
+
   /// JetBrains Mono for numbers, stats and code.
   static TextStyle mono(BuildContext context, {double size = 14, FontWeight weight = FontWeight.w600, Color? color}) =>
       GoogleFonts.jetBrainsMono(fontSize: size, fontWeight: weight, color: color ?? Theme.of(context).colorScheme.onSurface);

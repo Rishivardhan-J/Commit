@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter/services.dart';
 import '../../core/theme/commit_colors.dart';
 import '../../core/utils/day_key.dart';
+import '../../core/widgets/sync_feedback.dart';
+import '../../core/widgets/toast.dart';
 import '../../core/widgets/widgets.dart';
 import '../../data/app_store.dart';
+import '../../data/models.dart';
 import '../../services/notification_service.dart';
 import '../vault/vault_screen.dart';
 
@@ -30,8 +32,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final n = ref.read(appProvider.notifier);
     n.updateSettings(githubUser: gh.text.trim(), leetcodeUser: lc.text.trim());
     setState(() => syncing = true);
-    await n.sync(force: true);
+    final report = await n.sync(force: true);
     if (mounted) setState(() => syncing = false);
+    reportSync(report, manual: true);
   }
 
   @override
@@ -49,8 +52,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         CCard(
           child: Column(children: [
             TextField(controller: gh, autocorrect: false, decoration: const InputDecoration(labelText: 'GitHub username', prefixIcon: Icon(Icons.code))),
+            _SyncStatus(state: s, id: 'github', username: s.githubUser),
             const SizedBox(height: 10),
             TextField(controller: lc, autocorrect: false, decoration: const InputDecoration(labelText: 'LeetCode username', prefixIcon: Icon(Icons.terminal))),
+            _SyncStatus(state: s, id: 'leetcode', username: s.leetcodeUser),
             const SizedBox(height: 6),
             Text('Only public profile data is read. Commit never asks for a password.',
                 style: context.text.bodySmall?.copyWith(color: cc.textSecondary)),
@@ -59,8 +64,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               width: double.infinity,
               child: FilledButton(onPressed: syncing ? null : _saveAccounts, child: Text(syncing ? 'Syncing…' : 'Save & sync')),
             ),
-            for (final e in s.syncErrors.entries)
-              Padding(padding: const EdgeInsets.only(top: 8), child: Text('${e.key}: ${e.value}', style: TextStyle(color: cc.warning))),
           ]),
         ),
         const SectionTitle('Appearance'),
@@ -86,8 +89,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 if (v) {
                   await NotificationService.instance.requestPermission();
                   n.replanReminder();
+                  AppToast.show('Reminder on · ${s.reminderHour.toString().padLeft(2, '0')}:00 each evening', icon: Icons.notifications_active_rounded);
                 } else {
                   await NotificationService.instance.cancelAll();
+                  AppToast.show('Reminders off', kind: ToastKind.info, icon: Icons.notifications_off_rounded);
                 }
               },
             ),
@@ -100,6 +105,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 if (t != null) {
                   n.updateSettings(reminderHour: t.hour);
                   n.replanReminder();
+                  AppToast.show('Reminder set for ${t.hour.toString().padLeft(2, '0')}:00', icon: Icons.alarm_on_rounded);
                 }
               },
             ),
@@ -108,8 +114,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               subtitle: const Text('Rest days keep your streak. Recovery is part of the work.'),
               trailing: s.restDays.contains(addDays(today, 1)) ? Icon(Icons.check_circle, color: cc.success) : null,
               onTap: () {
+                final already = s.restDays.contains(addDays(today, 1));
                 n.scheduleRestDay(addDays(today, 1));
-                HapticFeedback.selectionClick();
+                AppToast.show(
+                  already ? 'Tomorrow is already a rest day' : 'Rest day planned for tomorrow — your streak is safe',
+                  kind: already ? ToastKind.info : ToastKind.success,
+                  icon: Icons.self_improvement_rounded,
+                );
               },
             ),
             SwitchListTile(
@@ -118,6 +129,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               onChanged: (v) async {
                 await prefs.setBool(vaultLockKey, v);
                 setState(() {});
+                AppToast.show(v ? 'Vault lock on' : 'Vault lock off', icon: v ? Icons.lock_rounded : Icons.lock_open_rounded);
               },
             ),
           ]),
@@ -140,10 +152,53 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ],
                 ),
               );
-              if (ok == true) n.resetAll();
+              if (ok == true) {
+                n.resetAll();
+                AppToast.show('All data cleared', kind: ToastKind.info);
+              }
             },
           ),
         ),
+      ]),
+    );
+  }
+}
+
+/// Persistent per-platform status under each username field.
+class _SyncStatus extends StatelessWidget {
+  final AppState state;
+  final String id, username;
+  const _SyncStatus({required this.state, required this.id, required this.username});
+
+  @override
+  Widget build(BuildContext context) {
+    if (username.isEmpty) return const SizedBox.shrink();
+    final err = state.syncErrors[id];
+    final snap = state.snapshots[id];
+    final cc = context.cc;
+    final String text;
+    final Color color;
+    final IconData icon;
+    if (err != null) {
+      text = '$err — showing ${snap == null ? 'no' : 'cached'} data';
+      color = cc.warning;
+      icon = Icons.error_outline_rounded;
+    } else if (snap != null) {
+      final t = TimeOfDay.fromDateTime(snap.fetchedAt).format(context);
+      text = 'Synced at $t';
+      color = cc.success;
+      icon = Icons.check_circle_outline_rounded;
+    } else {
+      text = 'Not synced yet';
+      color = cc.textSecondary;
+      icon = Icons.sync_rounded;
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 6, left: 4),
+      child: Row(children: [
+        Icon(icon, size: 15, color: color),
+        const SizedBox(width: 6),
+        Expanded(child: Text(text, style: context.text.bodySmall?.copyWith(color: color))),
       ]),
     );
   }
