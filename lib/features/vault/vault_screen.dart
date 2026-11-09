@@ -1,0 +1,254 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:local_auth/local_auth.dart';
+import '../../core/theme/commit_colors.dart';
+import '../../core/utils/day_key.dart';
+import '../../core/widgets/widgets.dart';
+import '../../data/app_store.dart';
+import '../../data/models.dart';
+
+const vaultLockKey = 'vault_lock';
+
+class VaultScreen extends ConsumerStatefulWidget {
+  const VaultScreen({super.key});
+  @override
+  ConsumerState<VaultScreen> createState() => _VaultScreenState();
+}
+
+class _VaultScreenState extends ConsumerState<VaultScreen> {
+  WalletKind? kind; // null = all
+  String query = '';
+  bool unlocked = false;
+  bool get locked => ref.read(prefsProvider).getBool(vaultLockKey) ?? false;
+
+  Future<void> _unlock() async {
+    try {
+      final ok = await LocalAuthentication().authenticate(localizedReason: 'Unlock your vault');
+      if (ok && mounted) setState(() => unlocked = true);
+    } catch (_) {
+      // No biometrics available: fail open rather than lock the user out of their own data.
+      if (mounted) setState(() => unlocked = true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (locked && !unlocked) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Vault')),
+        body: Center(
+          child: EmptyState(emoji: '🔒', title: 'Vault is locked', subtitle: 'Authenticate to see your ideas and hackathons.', cta: 'Unlock', onCta: _unlock),
+        ),
+      );
+    }
+    final s = ref.watch(appProvider);
+    final q = query.toLowerCase();
+    final items = s.wallet.where((w) {
+      if (kind != null && w.kind != kind) return false;
+      if (q.isEmpty) return true;
+      return w.title.toLowerCase().contains(q) ||
+          w.body.toLowerCase().contains(q) ||
+          w.tags.any((t) => t.toLowerCase().contains(q));
+    }).toList()
+      ..sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Vault')),
+      body: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 100), children: [
+        TextField(
+          onChanged: (v) => setState(() => query = v),
+          decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Search ideas, tags, hackathons'),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 40,
+          child: ListView(scrollDirection: Axis.horizontal, children: [
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ChoiceChip(label: const Text('All'), selected: kind == null, onSelected: (_) => setState(() => kind = null)),
+            ),
+            for (final k in WalletKind.values)
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: ChoiceChip(label: Text(k.label), selected: kind == k, onSelected: (_) => setState(() => kind = k)),
+              ),
+          ]),
+        ),
+        const SizedBox(height: 12),
+        if (items.isEmpty)
+          EmptyState(
+            emoji: '💡',
+            title: s.wallet.isEmpty ? 'Your vault is empty' : 'No matches',
+            subtitle: 'Ideas, hackathons, projects and links live here. Hold the + button for a 5-second idea.',
+            cta: 'Add to vault',
+            onCta: () => showAddWallet(context, kind ?? WalletKind.idea),
+          )
+        else
+          for (final w in items) Padding(padding: const EdgeInsets.only(bottom: 10), child: _WalletCard(item: w)),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed: () => showAddWallet(context, kind ?? WalletKind.idea),
+          icon: const Icon(Icons.add),
+          label: const Text('New entry'),
+        ),
+      ]),
+    );
+  }
+}
+
+class _WalletCard extends ConsumerWidget {
+  final WalletItem item;
+  const _WalletCard({required this.item});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cc = context.cc;
+    final color = cc.kindColor(item.kind.name);
+    final n = ref.read(appProvider.notifier);
+    final today = ref.watch(todayProvider);
+    String? countdown;
+    if (item.kind == WalletKind.hackathon && item.extra['start'] != null) {
+      try {
+        final d = daysBetween(today, item.extra['start']!);
+        countdown = d > 0 ? 'in $d days' : d == 0 ? 'today' : 'started';
+      } catch (_) {}
+    }
+    return Dismissible(
+      key: ValueKey('wallet-${item.id}'),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        decoration: BoxDecoration(color: context.scheme.error.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(16)),
+        child: Icon(Icons.delete_outline, color: context.scheme.error),
+      ),
+      onDismissed: (_) => n.deleteWallet(item.id),
+      child: CCard(
+        onTap: () => showAddWallet(context, item.kind, existing: item),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Pill(item.kind.name, color: color),
+            const SizedBox(width: 6),
+            if (item.kind == WalletKind.idea) Pill(item.status, color: cc.textSecondary),
+            if (countdown != null) Pill(countdown, color: cc.warning, icon: Icons.timer_outlined),
+            const Spacer(),
+            IconButton(
+              tooltip: item.pinned ? 'Unpin' : 'Pin',
+              visualDensity: VisualDensity.compact,
+              icon: Icon(item.pinned ? Icons.push_pin : Icons.push_pin_outlined, size: 20),
+              onPressed: () => n.togglePin(item.id),
+            ),
+          ]),
+          const SizedBox(height: 6),
+          Text(item.title, style: context.text.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+          if (item.body.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(item.body, maxLines: 3, overflow: TextOverflow.ellipsis, style: context.text.bodyMedium?.copyWith(color: cc.textSecondary)),
+            ),
+          if (item.tags.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Wrap(spacing: 6, children: [for (final t in item.tags) Pill('#$t')]),
+            ),
+        ]),
+      ),
+    );
+  }
+}
+
+Future<void> showAddWallet(BuildContext context, WalletKind kind, {WalletItem? existing}) =>
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (_) => _WalletForm(kind: kind, existing: existing),
+    );
+
+class _WalletForm extends ConsumerStatefulWidget {
+  final WalletKind kind;
+  final WalletItem? existing;
+  const _WalletForm({required this.kind, this.existing});
+  @override
+  ConsumerState<_WalletForm> createState() => _WalletFormState();
+}
+
+class _WalletFormState extends ConsumerState<_WalletForm> {
+  late WalletKind kind = widget.kind;
+  late final title = TextEditingController(text: widget.existing?.title);
+  late final body = TextEditingController(text: widget.existing?.body);
+  late final tags = TextEditingController(text: widget.existing?.tags.join(', '));
+  late final link = TextEditingController(text: widget.existing?.extra['link']);
+  late final start = TextEditingController(text: widget.existing?.extra['start']);
+  late final team = TextEditingController(text: widget.existing?.extra['team']);
+  late String status = widget.existing?.status ?? 'raw';
+
+  void save() {
+    if (title.text.trim().isEmpty) return;
+    final n = ref.read(appProvider.notifier);
+    if (widget.existing != null) n.deleteWallet(widget.existing!.id);
+    n.addWallet(WalletItem(
+      id: '',
+      kind: kind,
+      title: title.text.trim(),
+      body: body.text.trim(),
+      tags: tags.text.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
+      status: status,
+      pinned: widget.existing?.pinned ?? false,
+      extra: {
+        if (link.text.trim().isNotEmpty) 'link': link.text.trim(),
+        if (start.text.trim().isNotEmpty) 'start': start.text.trim(),
+        if (team.text.trim().isNotEmpty) 'team': team.text.trim(),
+      },
+    ));
+    Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.viewInsetsOf(context).bottom + 20),
+        child: SingleChildScrollView(
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Wrap(spacing: 8, children: [
+              for (final k in WalletKind.values)
+                ChoiceChip(label: Text(k.label), selected: kind == k, onSelected: (_) => setState(() => kind = k)),
+            ]),
+            const SizedBox(height: 12),
+            TextField(controller: title, autofocus: widget.existing == null, decoration: InputDecoration(hintText: switch (kind) {
+              WalletKind.idea => 'Idea title',
+              WalletKind.hackathon => 'Hackathon name',
+              WalletKind.project => 'Project name',
+              WalletKind.resource => 'Resource title',
+            })),
+            const SizedBox(height: 10),
+            TextField(controller: body, maxLines: 3, decoration: InputDecoration(hintText: kind == WalletKind.hackathon ? 'Theme / problem statement' : 'Description')),
+            if (kind == WalletKind.idea) ...[
+              const SizedBox(height: 10),
+              SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(value: 'raw', label: Text('Raw')),
+                  ButtonSegment(value: 'in progress', label: Text('In progress')),
+                  ButtonSegment(value: 'shelved', label: Text('Shelved')),
+                ],
+                selected: {status},
+                onSelectionChanged: (v) => setState(() => status = v.first),
+              ),
+            ],
+            if (kind == WalletKind.hackathon) ...[
+              const SizedBox(height: 10),
+              TextField(controller: start, decoration: const InputDecoration(hintText: 'Start date (YYYY-MM-DD)')),
+              const SizedBox(height: 10),
+              TextField(controller: team, decoration: const InputDecoration(hintText: 'Team members')),
+            ],
+            if (kind != WalletKind.idea) ...[
+              const SizedBox(height: 10),
+              TextField(controller: link, keyboardType: TextInputType.url, decoration: const InputDecoration(hintText: 'Link (repo, submission, doc)')),
+            ],
+            const SizedBox(height: 10),
+            TextField(controller: tags, decoration: const InputDecoration(hintText: 'Tags, comma separated')),
+            const SizedBox(height: 16),
+            SizedBox(width: double.infinity, child: FilledButton(onPressed: save, child: const Text('Save'))),
+          ]),
+        ),
+      );
+}
