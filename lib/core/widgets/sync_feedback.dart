@@ -9,8 +9,8 @@ void reportSync(SyncReport r, {required bool manual}) {
   final ci = r.autoCompleted.isEmpty
       ? null
       : r.autoCompleted.length == 1
-          ? '✅ CI passed: ${r.autoCompleted.first.title} (+${r.autoCompleted.first.xp} xp)'
-          : '✅ CI passed: ${r.autoCompleted.length} tasks ticked automatically';
+          ? 'CI passed: ${r.autoCompleted.first.title} (+${r.autoCompleted.first.xp} xp)'
+          : 'CI passed: ${r.autoCompleted.length} tasks ticked automatically';
 
   if (r.noAccounts) {
     if (manual) {
@@ -20,7 +20,7 @@ void reportSync(SyncReport r, {required bool manual}) {
   }
   final lines = <String>[
     for (final x in r.results)
-      if (manual || !x.ok) '${x.ok ? '✓' : '✗'} ${x.label} · ${x.message}${x.ok ? '' : ' — showing cached data'}',
+      if (manual || !x.ok) '${x.label} · ${x.message}${x.ok ? '' : ' — showing cached data'}',
     ?ci,
   ];
   if (lines.isEmpty) return;

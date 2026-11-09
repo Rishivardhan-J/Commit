@@ -15,7 +15,7 @@ class WidgetService {
       final done = staged.where((t) => t.done).length;
       final today1 = staged.isEmpty ? 'Nothing staged yet' : '$done of ${staged.length} done today';
       final cta = streak.committedToday
-          ? 'Day committed ✓'
+          ? 'Day committed'
           : done > 0
               ? 'Tap to commit the day'
               : (staged.isEmpty ? 'Stage today' : 'Finish one task');

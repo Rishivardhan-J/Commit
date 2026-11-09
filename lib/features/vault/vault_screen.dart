@@ -9,6 +9,8 @@ import '../../core/widgets/toast.dart';
 import '../../core/widgets/widgets.dart';
 import '../../data/app_store.dart';
 import '../../data/models.dart';
+import '../../core/widgets/confirm_dialog.dart';
+import '../../core/icons.dart';
 
 const vaultLockKey = 'vault_lock';
 
@@ -40,7 +42,7 @@ class _VaultScreenState extends ConsumerState<VaultScreen> {
       return Scaffold(
         appBar: AppBar(title: const Text('Vault')),
         body: Center(
-          child: EmptyState(emoji: '🔒', title: 'Vault is locked', subtitle: 'Authenticate to see your ideas and hackathons.', cta: 'Unlock', onCta: _unlock),
+          child: EmptyState(icon: AppIcons.lockKey, title: 'Vault is locked', subtitle: 'Authenticate to see your ideas and hackathons.', cta: 'Unlock', onCta: _unlock),
         ),
       );
     }
@@ -80,7 +82,7 @@ class _VaultScreenState extends ConsumerState<VaultScreen> {
         const SizedBox(height: 12),
         if (items.isEmpty)
           EmptyState(
-            emoji: '💡',
+            icon: AppIcons.lightbulb,
             title: s.wallet.isEmpty ? 'Your vault is empty' : 'No matches',
             subtitle: 'Ideas, hackathons, projects and links live here. Hold the + button for a 5-second idea.',
             cta: 'Add to vault',
@@ -123,7 +125,12 @@ class _WalletCard extends ConsumerWidget {
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
         decoration: BoxDecoration(color: context.scheme.error.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(16)),
-        child: Icon(Icons.delete_outline, color: context.scheme.error),
+        child: Icon(AppIcons.trash, color: context.scheme.error),
+      ),
+      confirmDismiss: (_) => confirmDestructive(
+        context,
+        title: 'Delete ${item.kind.name}?',
+        message: '“${item.title}” will be removed from your vault. You can undo right after.',
       ),
       onDismissed: (_) {
         n.deleteWallet(item.id);
@@ -241,6 +248,18 @@ class _WalletFormState extends ConsumerState<_WalletForm> {
     AppToast.show(widget.existing != null ? 'Changes saved' : 'Saved to vault', icon: Icons.lock_rounded);
   }
 
+  Future<void> delete() async {
+    final item = widget.existing!;
+    final ok = await confirmDestructive(context,
+        title: 'Delete ${item.kind.name}?', message: '“${item.title}” will be removed from your vault. You can undo right after.');
+    if (!ok || !mounted) return;
+    final n = ref.read(appProvider.notifier);
+    n.deleteWallet(item.id);
+    Navigator.pop(context);
+    AppToast.show('${item.kind.name[0].toUpperCase()}${item.kind.name.substring(1)} deleted',
+        kind: ToastKind.info, icon: Icons.delete_outline_rounded, actionLabel: 'Undo', onAction: () => n.restoreWallet(item));
+  }
+
   @override
   Widget build(BuildContext context) => Padding(
         padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.viewInsetsOf(context).bottom + 20),
@@ -297,6 +316,16 @@ class _WalletFormState extends ConsumerState<_WalletForm> {
             TextField(controller: tags, decoration: const InputDecoration(hintText: 'Tags, comma separated')),
             const SizedBox(height: 16),
             SizedBox(width: double.infinity, child: FilledButton(onPressed: save, child: const Text('Save'))),
+            if (widget.existing != null)
+              SizedBox(
+                width: double.infinity,
+                child: TextButton.icon(
+                  style: TextButton.styleFrom(foregroundColor: context.scheme.error),
+                  icon: const Icon(AppIcons.trash, size: 18),
+                  label: const Text('Delete'),
+                  onPressed: delete,
+                ),
+              ),
           ]),
         ),
       );

@@ -146,17 +146,37 @@ class Heatmap extends StatelessWidget {
   }
 }
 
+/// Rounded tinted tile holding a Phosphor icon; the app's replacement for emoji.
+class IconTile extends StatelessWidget {
+  final IconData icon;
+  final Color? color;
+  final double size;
+  const IconTile(this.icon, {super.key, this.color, this.size = 44});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = color ?? context.scheme.primary;
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(color: c.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(size * 0.3)),
+      child: Center(child: Icon(icon, size: size * 0.55, color: c)),
+    );
+  }
+}
+
 class EmptyState extends StatelessWidget {
-  final String emoji, title, subtitle;
+  final IconData icon;
+  final String title, subtitle;
   final String? cta;
   final VoidCallback? onCta;
-  const EmptyState({super.key, required this.emoji, required this.title, required this.subtitle, this.cta, this.onCta});
+  const EmptyState({super.key, required this.icon, required this.title, required this.subtitle, this.cta, this.onCta});
 
   @override
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.all(32),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Text(emoji, style: const TextStyle(fontSize: 44)),
+          IconTile(icon, size: 72),
           const SizedBox(height: 12),
           Text(title, style: context.text.titleMedium?.copyWith(fontWeight: FontWeight.w700), textAlign: TextAlign.center),
           const SizedBox(height: 6),

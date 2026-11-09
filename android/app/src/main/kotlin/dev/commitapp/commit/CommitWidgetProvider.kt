@@ -17,7 +17,7 @@ class CommitWidgetProvider : HomeWidgetProvider() {
     ) {
         appWidgetIds.forEach { id ->
             val views = RemoteViews(context.packageName, R.layout.commit_widget).apply {
-                setTextViewText(R.id.widget_streak, "🔥 " + (widgetData.getString("streak", "0") ?: "0"))
+                setTextViewText(R.id.widget_streak, widgetData.getString("streak", "0") ?: "0")
                 setTextViewText(R.id.widget_today, widgetData.getString("today", "Open Commit") ?: "Open Commit")
                 setTextViewText(R.id.widget_cta, widgetData.getString("cta", "Open Commit") ?: "Open Commit")
                 setOnClickPendingIntent(

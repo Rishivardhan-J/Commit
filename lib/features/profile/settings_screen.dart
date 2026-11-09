@@ -12,6 +12,8 @@ import '../../data/models.dart';
 import '../../services/backup_service.dart';
 import '../../services/notification_service.dart';
 import '../vault/vault_screen.dart';
+import '../../core/widgets/confirm_dialog.dart';
+import '../../core/icons.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -60,19 +62,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (path == null) throw const FormatException('Could not read that file.');
       final preview = BackupService.parse(await File(path).readAsString());
       if (!mounted) return;
-      final ok = await showDialog<bool>(
-        context: context,
-        builder: (c) => AlertDialog(
-          title: const Text('Restore this backup?'),
-          content: Text('${preview.commits} committed days, ${preview.tasks} tasks, ${preview.vault} vault items and '
-              '${preview.friends} friends.\n\nThis replaces what is on this phone now.'),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
-            TextButton(onPressed: () => Navigator.pop(c, true), child: const Text('Restore')),
-          ],
-        ),
+      final ok = await confirmDestructive(
+        context,
+        title: 'Restore this backup?',
+        message: '${preview.commits} committed days, ${preview.tasks} tasks, ${preview.vault} vault items and '
+            '${preview.friends} friends.\n\nThis replaces what is on this phone now.',
+        confirmLabel: 'Restore',
+        icon: AppIcons.clockCounterClockwise,
       );
-      if (ok == true) {
+      if (ok) {
         ref.read(appProvider.notifier).replaceState(preview.state);
         gh.text = preview.state.githubUser;
         lc.text = preview.state.leetcodeUser;
@@ -206,18 +204,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             title: Text('Reset all data', style: TextStyle(color: context.scheme.error)),
             subtitle: const Text('Deletes tasks, vault, streaks and XP from this device.'),
             onTap: () async {
-              final ok = await showDialog<bool>(
-                context: context,
-                builder: (c) => AlertDialog(
-                  title: const Text('Reset everything?'),
-                  content: const Text('This cannot be undone.'),
-                  actions: [
-                    TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
-                    TextButton(onPressed: () => Navigator.pop(c, true), child: const Text('Reset')),
-                  ],
-                ),
+              final ok = await confirmDestructive(
+                context,
+                title: 'Reset everything?',
+                message: 'Tasks, vault, streaks and XP will be erased from this device. This cannot be undone.',
+                confirmLabel: 'Reset',
+                icon: AppIcons.warning,
               );
-              if (ok == true) {
+              if (ok) {
                 n.resetAll();
                 AppToast.show('All data cleared', kind: ToastKind.info);
               }

@@ -1,15 +1,17 @@
 import '../core/utils/day_key.dart';
 import '../data/models.dart';
 import 'streak_engine.dart';
+import 'package:flutter/widgets.dart' show IconData;
+import '../core/icons.dart';
 
 class Challenge {
   final String id;
   final String title;
-  final String emoji;
+  final IconData icon;
   final int target;
   final int progress;
   final int rewardXp;
-  const Challenge(this.id, this.title, this.emoji, this.target, this.progress, this.rewardXp);
+  const Challenge(this.id, this.title, this.icon, this.target, this.progress, this.rewardXp);
   bool get done => progress >= target;
   double get fraction => (progress / target).clamp(0.0, 1.0);
 }
@@ -41,9 +43,9 @@ List<Challenge> weeklyChallenges(AppState s, String today) {
   final focusTarget = recentCommits >= 20 ? 180 : recentCommits >= 8 ? 120 : 75;
 
   return [
-    Challenge('days', 'Commit $dayTarget days this week', '🔥', dayTarget, committedDays, 60),
-    Challenge('tasks', 'Finish $taskTarget tasks', '✅', taskTarget, tasksDone, 50),
-    Challenge('focus', 'Focus for $focusTarget minutes', '🎯', focusTarget, focus, 50),
+    Challenge('days', 'Commit $dayTarget days this week', AppIcons.flame, dayTarget, committedDays, 60),
+    Challenge('tasks', 'Finish $taskTarget tasks', AppIcons.listChecks, taskTarget, tasksDone, 50),
+    Challenge('focus', 'Focus for $focusTarget minutes', AppIcons.timer, focusTarget, focus, 50),
   ];
 }
 

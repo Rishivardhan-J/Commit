@@ -17,6 +17,7 @@ import '../../core/widgets/widgets.dart';
 import '../../data/app_store.dart';
 import '../../engine/badge_engine.dart';
 import '../../engine/xp_engine.dart';
+import '../../core/icons.dart';
 
 /// The evening ritual: review the diff, write a one-line message, commit.
 class CommitScreen extends ConsumerStatefulWidget {
@@ -180,7 +181,10 @@ class _CelebrationState extends ConsumerState<_Celebration> {
                     child: Column(children: [
                       const CommitLogo(size: 44),
                       const SizedBox(height: 14),
-                      Text(result.critical ? '⚡ Critical commit' : 'Day committed', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+                      Row(mainAxisSize: MainAxisSize.min, children: [
+                        if (result.critical) ...[Icon(AppIcons.lightning, size: 24, color: cc.onAccent), const SizedBox(width: 6)],
+                        Text(result.critical ? 'Critical commit' : 'Day committed', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+                      ]),
                       const SizedBox(height: 6),
                       AnimatedCount(
                         value: result.streak,
@@ -201,14 +205,17 @@ class _CelebrationState extends ConsumerState<_Celebration> {
                   child: Pill('Level up → ${result.levelAfter}', color: context.scheme.primary, icon: Icons.arrow_upward_rounded),
                 ),
               if (result.hotfixed)
-                const Padding(padding: EdgeInsets.only(top: 12), child: Text('🩹 Hotfix! Your double day repaired yesterday and saved the streak.', textAlign: TextAlign.center)),
+                Padding(padding: const EdgeInsets.only(top: 12), child: _NoteRow(AppIcons.bandaids, 'Hotfix! Your double day repaired yesterday and saved the streak.')),
               if (result.stashEarned)
-                const Padding(padding: EdgeInsets.only(top: 12), child: Text('🧊 You earned a stash — it protects your streak if you miss a day.', textAlign: TextAlign.center)),
+                Padding(padding: const EdgeInsets.only(top: 12), child: _NoteRow(AppIcons.snowflake, 'You earned a stash — it protects your streak if you miss a day.')),
               for (final id in result.newBadges)
                 Padding(
                   padding: const EdgeInsets.only(top: 12),
-                  child: Text('${badgeById(id)?.emoji} Badge: ${badgeById(id)?.name}',
-                      style: context.text.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(badgeById(id)?.icon ?? AppIcons.medal, size: 22, color: context.scheme.primary),
+                    const SizedBox(width: 8),
+                    Text('Badge: ${badgeById(id)?.name}', style: context.text.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+                  ]),
                 ).animate().fadeIn(delay: 500.ms),
               const SizedBox(height: 28),
               Row(children: [
@@ -228,4 +235,16 @@ class _CelebrationState extends ConsumerState<_Celebration> {
       ]),
     );
   }
+}
+
+class _NoteRow extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  const _NoteRow(this.icon, this.text);
+  @override
+  Widget build(BuildContext context) => Row(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Icon(icon, size: 20, color: context.scheme.primary),
+        const SizedBox(width: 8),
+        Flexible(child: Text(text, textAlign: TextAlign.center)),
+      ]);
 }

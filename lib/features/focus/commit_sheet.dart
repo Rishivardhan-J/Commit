@@ -8,6 +8,7 @@ import '../../core/widgets/toast.dart';
 import '../../data/app_store.dart';
 import 'commit_grid.dart';
 import 'focus_controller.dart';
+import '../../core/icons.dart';
 
 /// Shown when a focus block ends: review it, say how it went, and "commit" it to the log.
 /// XP is already banked; this only annotates the log entry, so dismissing loses nothing.
@@ -83,7 +84,10 @@ class _CommitSheetState extends ConsumerState<_CommitSheet> with SingleTickerPro
         padding: EdgeInsets.fromLTRB(20, 4, 20, MediaQuery.viewInsetsOf(context).bottom + 20),
         child: SingleChildScrollView(
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(e.cycleDone ? '⚡ Full cycle complete' : 'Block finished', style: context.text.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+            Row(children: [
+              if (e.cycleDone) ...[Icon(AppIcons.lightning, size: 24, color: cc.warning), const SizedBox(width: 8)],
+              Text(e.cycleDone ? 'Full cycle complete' : 'Block finished', style: context.text.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+            ]),
             const SizedBox(height: 14),
             Center(
               child: AnimatedBuilder(
@@ -119,9 +123,9 @@ class _CommitSheetState extends ConsumerState<_CommitSheet> with SingleTickerPro
             SegmentedButton<String>(
               showSelectedIcon: false,
               segments: const [
-                ButtonSegment(value: 'shipped', label: Text('✓ Shipped')),
-                ButtonSegment(value: 'partly', label: Text('◐ Partly')),
-                ButtonSegment(value: 'notyet', label: Text('✗ Not yet')),
+                ButtonSegment(value: 'shipped', icon: Icon(AppIcons.check), label: Text('Shipped')),
+                ButtonSegment(value: 'partly', icon: Icon(AppIcons.circleHalf), label: Text('Partly')),
+                ButtonSegment(value: 'notyet', icon: Icon(AppIcons.x), label: Text('Not yet')),
               ],
               selected: {outcome},
               onSelectionChanged: (v) => setState(() => outcome = v.first),

@@ -8,6 +8,7 @@ import '../../core/widgets/widgets.dart';
 import '../../data/app_store.dart';
 import '../../engine/challenge_engine.dart';
 import '../../engine/xp_engine.dart';
+import '../../core/icons.dart';
 
 class SkillsScreen extends ConsumerWidget {
   const SkillsScreen({super.key});
@@ -48,7 +49,7 @@ class SkillsScreen extends ConsumerWidget {
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 6),
                 child: Row(children: [
-                  Text(c.done ? '🏆' : c.emoji, style: const TextStyle(fontSize: 22)),
+                  IconTile(c.done ? AppIcons.trophy : c.icon, size: 40, color: c.done ? cc.warning : null),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -79,7 +80,7 @@ class SkillsScreen extends ConsumerWidget {
         CCard(
           onTap: () => context.push('/friends'),
           child: Row(children: [
-            const Text('🏁', style: TextStyle(fontSize: 26)),
+            const IconTile(AppIcons.flagCheckered, size: 44),
             const SizedBox(width: 14),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -124,7 +125,7 @@ class SkillsScreen extends ConsumerWidget {
         ],
         const SectionTitle('Levels'),
         if (names.isEmpty)
-          const CCard(child: EmptyState(emoji: '🌱', title: 'No skills yet', subtitle: 'Complete a tagged task and commit the day to start levelling up.'))
+          const CCard(child: EmptyState(icon: AppIcons.plant, title: 'No skills yet', subtitle: 'Complete a tagged task and commit the day to start levelling up.'))
         else
           CCard(
             child: Column(children: [

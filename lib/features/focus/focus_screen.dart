@@ -15,6 +15,7 @@ import 'commit_grid.dart';
 import 'commit_sheet.dart';
 import 'focus_controller.dart';
 import 'ruler.dart';
+import '../../core/icons.dart';
 
 /// "Commit grid" focus timer: one square per minute fills like a contribution graph, you write
 /// a commit message first, and every finished block lands in a git-style log.
@@ -121,7 +122,8 @@ class _FocusScreenState extends ConsumerState<FocusScreen> with SingleTickerProv
               Wrap(spacing: 8, runSpacing: 8, children: [
                 for (final s in ambientSounds)
                   ChoiceChip(
-                    label: Text('${s.emoji} ${s.label}'),
+                    avatar: Icon(s.icon, size: 18),
+                    label: Text(s.label),
                     selected: fs.sound == s.id,
                     onSelected: (_) => ctl.setSound(s.id),
                   ),
@@ -426,7 +428,7 @@ class _FocusScreenState extends ConsumerState<FocusScreen> with SingleTickerProv
                         SimpleDialogOption(onPressed: () {
                           ctl.setDailyGoal(g);
                           Navigator.pop(c);
-                        }, child: Text('$g minutes${g == fs.dailyGoal ? '  ✓' : ''}')),
+                        }, child: Row(children: [Expanded(child: Text('$g minutes')), if (g == fs.dailyGoal) Icon(AppIcons.check, size: 18)])),
                     ]),
                   ),
                 ),
@@ -448,7 +450,7 @@ class _FocusScreenState extends ConsumerState<FocusScreen> with SingleTickerProv
           const SectionTitle('Focus log'),
           if (log.isEmpty)
             CCard(
-              child: EmptyState(emoji: '🌱', title: 'No commits yet', subtitle: 'Finish a block and it lands here like a git log.'),
+              child: EmptyState(icon: AppIcons.plant, title: 'No commits yet', subtitle: 'Finish a block and it lands here like a git log.'),
             )
           else ...[
             CCard(
@@ -472,7 +474,7 @@ class _LogRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cc = context.cc;
-    final glyph = switch (f.outcome) { 'partly' => '◐', 'notyet' => '✗', _ => '✓' };
+    final glyph = switch (f.outcome) { 'partly' => AppIcons.circleHalf, 'notyet' => AppIcons.xCircle, _ => AppIcons.checkCircle };
     final color = switch (f.outcome) { 'partly' => cc.warning, 'notyet' => context.scheme.error, _ => cc.success };
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -486,7 +488,7 @@ class _LogRow extends StatelessWidget {
                 style: context.text.labelSmall?.copyWith(color: cc.textSecondary)),
           ]),
         ),
-        Text(glyph, style: TextStyle(color: color, fontWeight: FontWeight.w800, fontSize: 16)),
+        Icon(glyph, size: 20, color: color),
       ]),
     );
   }

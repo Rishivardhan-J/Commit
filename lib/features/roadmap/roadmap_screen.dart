@@ -6,6 +6,7 @@ import '../../core/widgets/toast.dart';
 import '../../core/widgets/widgets.dart';
 import '../../data/app_store.dart';
 import '../../data/models.dart';
+import '../../core/icons.dart';
 
 class _Step {
   final String title, skill;
@@ -16,13 +17,14 @@ class _Step {
 }
 
 class _Roadmap {
-  final String name, emoji, blurb;
+  final String name, blurb;
+  final IconData icon;
   final List<List<_Step>> weeks;
-  const _Roadmap(this.name, this.emoji, this.blurb, this.weeks);
+  const _Roadmap(this.name, this.icon, this.blurb, this.weeks);
 }
 
 const _roadmaps = [
-  _Roadmap('Placement prep', '🎯', 'DSA fundamentals, a project and interview practice.', [
+  _Roadmap('Placement prep', AppIcons.briefcase, 'DSA fundamentals, a project and interview practice.', [
     [
       _Step('Solve 3 array problems', 'Arrays', TaskType.dsa, 2, AutoRule('lc.solved', 3)),
       _Step('Revise hashing patterns', 'Hashing', TaskType.learning, 1),
@@ -39,7 +41,7 @@ const _roadmaps = [
       _Step('Mock interview with a friend', 'Communication', TaskType.learning, 2),
     ],
   ]),
-  _Roadmap('Web development', '🌐', 'From HTML/CSS to a deployed full-stack app.', [
+  _Roadmap('Web development', AppIcons.globe, 'From HTML/CSS to a deployed full-stack app.', [
     [
       _Step('Build a responsive landing page', 'CSS', TaskType.project, 2, AutoRule('gh.commits', 1)),
       _Step('Learn JS array methods', 'JavaScript', TaskType.learning, 1),
@@ -53,7 +55,7 @@ const _roadmaps = [
       _Step('Deploy the app', 'DevOps', TaskType.project, 3),
     ],
   ]),
-  _Roadmap('Machine learning', '🧠', 'Math basics to a trained, evaluated model.', [
+  _Roadmap('Machine learning', AppIcons.brain, 'Math basics to a trained, evaluated model.', [
     [
       _Step('Revise linear algebra: vectors & matrices', 'Math', TaskType.learning, 1),
       _Step('Clean a dataset with pandas', 'Python', TaskType.project, 2),
@@ -66,7 +68,7 @@ const _roadmaps = [
       _Step('Write up results in a notebook', 'Machine Learning', TaskType.project, 2, AutoRule('gh.commits', 1)),
     ],
   ]),
-  _Roadmap('GSoC / open source', '🌍', 'Find a project, land a first PR.', [
+  _Roadmap('GSoC / open source', AppIcons.gitPullRequest, 'Find a project, land a first PR.', [
     [
       _Step('Shortlist 3 orgs and read their contribution guides', 'Open Source', TaskType.openSource, 1),
       _Step('Set up one project locally', 'Open Source', TaskType.openSource, 2),
@@ -100,7 +102,11 @@ class RoadmapScreen extends ConsumerWidget {
             padding: const EdgeInsets.only(bottom: 12),
             child: CCard(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('${r.emoji}  ${r.name}', style: context.text.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                Row(children: [
+                  IconTile(r.icon, size: 36),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text(r.name, style: context.text.titleMedium?.copyWith(fontWeight: FontWeight.w700))),
+                ]),
                 const SizedBox(height: 4),
                 Text(r.blurb, style: context.text.bodySmall?.copyWith(color: cc.textSecondary)),
                 const SizedBox(height: 10),

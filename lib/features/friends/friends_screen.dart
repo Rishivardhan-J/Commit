@@ -9,6 +9,8 @@ import '../../core/widgets/widgets.dart';
 import '../../data/app_store.dart';
 import '../../data/models.dart';
 import '../../engine/coding_score.dart';
+import '../../core/widgets/confirm_dialog.dart';
+import '../../core/icons.dart';
 
 enum _Metric { score, week, solved }
 
@@ -117,7 +119,7 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
         if (s.friends.isEmpty)
           CCard(
             child: EmptyState(
-              emoji: '🤝',
+              icon: AppIcons.usersThree,
               title: 'Race your classmates',
               subtitle: 'Add a friend by their public usernames. No sign-up, no accounts.',
               cta: 'Add a friend',
@@ -144,10 +146,15 @@ class _LeaderRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final cc = context.cc;
-    final medal = rank == 1 ? '🥇' : rank == 2 ? '🥈' : rank == 3 ? '🥉' : '$rank';
+    final medalColor = switch (rank) { 1 => const Color(0xFFF5B301), 2 => const Color(0xFF9CA3AF), 3 => const Color(0xFFC77D3A), _ => null };
     final card = CCard(
       child: Row(children: [
-        SizedBox(width: 34, child: Text(medal, style: TextStyle(fontSize: rank <= 3 ? 22 : 16, fontWeight: FontWeight.w800, color: cc.textSecondary))),
+        SizedBox(
+          width: 34,
+          child: medalColor != null
+              ? Align(alignment: Alignment.centerLeft, child: Icon(AppIcons.medal, size: 26, color: medalColor))
+              : Text('$rank', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: cc.textSecondary)),
+        ),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
@@ -180,7 +187,14 @@ class _LeaderRow extends ConsumerWidget {
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
         decoration: BoxDecoration(color: context.scheme.error.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(16)),
-        child: Icon(Icons.person_remove_rounded, color: context.scheme.error),
+        child: Icon(AppIcons.userMinus, color: context.scheme.error),
+      ),
+      confirmDismiss: (_) => confirmDestructive(
+        context,
+        title: 'Remove ${row.name}?',
+        message: 'They will disappear from your leaderboard. You can undo right after.',
+        confirmLabel: 'Remove',
+        icon: AppIcons.userMinus,
       ),
       onDismissed: (_) {
         final n = ref.read(appProvider.notifier);

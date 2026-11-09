@@ -16,6 +16,7 @@ import '../../engine/suggestion_engine.dart';
 import '../../engine/xp_engine.dart';
 import '../capture/capture_sheet.dart';
 import '../tasks/task_tile.dart';
+import '../../core/icons.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -113,7 +114,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(color: cc.onAccent.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(14)),
                       child: Column(children: [
-                        AnimatedCount(value: streak.current, prefix: '🔥 ', style: AppTheme.mono(context, size: 20, weight: FontWeight.w800, color: cc.onAccent)),
+                        Row(mainAxisSize: MainAxisSize.min, children: [
+                          Icon(AppIcons.flame, size: 20, color: cc.onAccent),
+                          const SizedBox(width: 4),
+                          AnimatedCount(value: streak.current, style: AppTheme.mono(context, size: 20, weight: FontWeight.w800, color: cc.onAccent)),
+                        ]),
                         Text('day streak', style: TextStyle(fontSize: 11, color: cc.onAccent)),
                       ]),
                     ),
@@ -122,7 +127,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   Wrap(spacing: 8, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
                     Text('Lv ${level.level} · ${level.remaining} xp to Lv ${level.level + 1}',
                         style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-                    Text('🧊 ${s.stash} stash', style: const TextStyle(fontSize: 13)),
+                    Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(AppIcons.snowflake, size: 14, color: cc.onAccent),
+                      const SizedBox(width: 4),
+                      Text('${s.stash} stash', style: const TextStyle(fontSize: 13)),
+                    ]),
                   ]),
                   const SizedBox(height: 8),
                   ClipRRect(
@@ -141,7 +150,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   padding: const EdgeInsets.only(top: 12),
                   child: CCard(
                     child: Row(children: [
-                      const Text('🩹', style: TextStyle(fontSize: 22)),
+                      IconTile(AppIcons.bandaids, color: cc.warning, size: 40),
                       const SizedBox(width: 12),
                       Expanded(child: Text('Missed yesterday? Finish 2 or more tasks today and commit — a double-day hotfix saves your streak.', style: context.text.bodyMedium)),
                     ]),
@@ -194,7 +203,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 child: staged.isEmpty
                     ? EmptyState(
-                        emoji: '🗂️',
+                        icon: AppIcons.tray,
                         title: 'Nothing staged yet',
                         subtitle: 'Pick 1–3 things for today. Small, specific, doable.',
                         cta: 'Stage a task',

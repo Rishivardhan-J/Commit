@@ -5,9 +5,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/commit_colors.dart';
 import '../../core/widgets/commit_logo.dart';
 import '../../core/widgets/toast.dart';
+import '../../core/widgets/widgets.dart';
 import '../../data/app_store.dart';
 import '../../data/models.dart';
 import '../capture/capture_sheet.dart';
+import '../../core/icons.dart';
 
 const identities = {
   'Backend developer': ['System Design', 'Python', 'Databases'],
@@ -69,10 +71,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         final snap = await n.probe(platform, user.trim());
         n.cacheSnapshot(snap);
         return platform == 'github'
-            ? '✓ ${snap.stats['repos']} repos found'
-            : '✓ ${snap.stats['solved'] ?? 0} problems solved';
+            ? 'ok:${snap.stats['repos']} repos found'
+            : 'ok:${snap.stats['solved'] ?? 0} problems solved';
       } catch (e) {
-        return '✗ $e';
+        return 'err:$e';
       }
     }
 
@@ -84,7 +86,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       cfMsg = r[2];
       checking = false;
     });
-    final ok = !(r.any((m) => m != null && m.startsWith('✗')));
+    final ok = !(r.any((m) => m != null && m.startsWith('err:')));
     if (ok) next();
   }
 
@@ -95,9 +97,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       name: name.text.trim(),
       identity: identity ?? 'developer',
       skills: focus,
-      github: ghMsg?.startsWith('✓') == true ? gh.text.trim() : '',
-      leetcode: lcMsg?.startsWith('✓') == true ? lc.text.trim() : '',
-      codeforces: cfMsg?.startsWith('✓') == true ? cf.text.trim() : '',
+      github: ghMsg?.startsWith('ok:') == true ? gh.text.trim() : '',
+      leetcode: lcMsg?.startsWith('ok:') == true ? lc.text.trim() : '',
+      codeforces: cfMsg?.startsWith('ok:') == true ? cf.text.trim() : '',
     );
     final title = task.text.trim();
     if (title.isNotEmpty) {
@@ -108,13 +110,26 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     AppToast.show('Initial commit made — day 1 of your streak starts now', icon: Icons.eco_rounded);
   }
 
+  Widget _result(String m) {
+    final ok = m.startsWith('ok:');
+    final color = ok ? context.cc.success : context.scheme.error;
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Row(children: [
+        Icon(ok ? AppIcons.checkCircle : AppIcons.warningCircle, size: 16, color: color),
+        const SizedBox(width: 6),
+        Expanded(child: Text(m.substring(m.indexOf(':') + 1), style: TextStyle(color: color))),
+      ]),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cc = context.cc;
-    Widget shell(String emoji, String title, String sub, Widget body, Widget action, {Widget? lead}) => Padding(
+    Widget shell(IconData icon, String title, String sub, Widget body, Widget action, {Widget? lead}) => Padding(
           padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            lead ?? Text(emoji, style: const TextStyle(fontSize: 40)),
+            lead ?? IconTile(icon, size: 56),
             const SizedBox(height: 12),
             Text(title, style: context.text.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
             const SizedBox(height: 6),
@@ -151,7 +166,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               physics: const NeverScrollableScrollPhysics(),
               children: [
                 shell(
-                  '👋',
+                  AppIcons.handWaving,
                   'Commit code.\nCommit to goals.',
                   'Every day is a commit. Your history is your proof. What should we call you?',
                   TextField(controller: name, textCapitalization: TextCapitalization.words, decoration: const InputDecoration(hintText: 'Your name'), onChanged: (_) => setState(() {})),
@@ -159,7 +174,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   lead: const CommitLogo(size: 64),
                 ),
                 shell(
-                  '🧬',
+                  AppIcons.dna,
                   "I'm becoming a…",
                   'Each task you finish is a vote for who you are becoming.',
                   Column(children: [
@@ -193,18 +208,18 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   FilledButton(onPressed: identity == null || skills.isEmpty ? null : next, child: const Text('Continue')),
                 ),
                 shell(
-                  '🔗',
+                  AppIcons.link,
                   'Link your platforms',
                   'Public usernames only — real work will tick your tasks off automatically. You can skip this.',
                   Column(children: [
                     TextField(controller: gh, autocorrect: false, decoration: const InputDecoration(labelText: 'GitHub username', prefixIcon: Icon(Icons.code))),
-                    if (ghMsg != null) Padding(padding: const EdgeInsets.only(top: 6), child: Align(alignment: Alignment.centerLeft, child: Text(ghMsg!, style: TextStyle(color: ghMsg!.startsWith('✓') ? cc.success : context.scheme.error)))),
+                    if (ghMsg != null) _result(ghMsg!),
                     const SizedBox(height: 12),
                     TextField(controller: lc, autocorrect: false, decoration: const InputDecoration(labelText: 'LeetCode username', prefixIcon: Icon(Icons.terminal))),
-                    if (lcMsg != null) Padding(padding: const EdgeInsets.only(top: 6), child: Align(alignment: Alignment.centerLeft, child: Text(lcMsg!, style: TextStyle(color: lcMsg!.startsWith('✓') ? cc.success : context.scheme.error)))),
+                    if (lcMsg != null) _result(lcMsg!),
                     const SizedBox(height: 12),
                     TextField(controller: cf, autocorrect: false, decoration: const InputDecoration(labelText: 'Codeforces handle', prefixIcon: Icon(Icons.bar_chart_rounded))),
-                    if (cfMsg != null) Padding(padding: const EdgeInsets.only(top: 6), child: Align(alignment: Alignment.centerLeft, child: Text(cfMsg!, style: TextStyle(color: cfMsg!.startsWith('✓') ? cc.success : context.scheme.error)))),
+                    if (cfMsg != null) _result(cfMsg!),
                     const SizedBox(height: 8),
                     TextButton(onPressed: next, child: const Text('Skip for now')),
                   ]),
@@ -214,7 +229,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   ),
                 ),
                 shell(
-                  '🌱',
+                  AppIcons.plant,
                   'Your initial commit',
                   'Start with a win. What did you learn or do today, even something tiny?',
                   Column(children: [

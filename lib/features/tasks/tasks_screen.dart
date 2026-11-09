@@ -9,6 +9,7 @@ import '../../data/app_store.dart';
 import '../../data/models.dart';
 import '../capture/capture_sheet.dart';
 import 'task_tile.dart';
+import '../../core/icons.dart';
 
 class TasksScreen extends ConsumerStatefulWidget {
   const TasksScreen({super.key});
@@ -35,7 +36,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
 
     Widget list(List<Task> ts, {bool toggle = false}) => ts.isEmpty
         ? EmptyState(
-            emoji: tab == 0 ? '✨' : '📭',
+            icon: tab == 0 ? AppIcons.sparkle : AppIcons.tray,
             title: tab == 0 ? 'A clean working tree' : 'Nothing here',
             subtitle: 'Tap + to add a task in a few seconds.',
             cta: 'Add a task',
@@ -84,7 +85,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
           if (planned.isEmpty)
             CCard(
               child: EmptyState(
-                emoji: '🗓️',
+                icon: AppIcons.calendarBlank,
                 title: dayOffset == 0 ? 'Nothing planned today' : 'Nothing planned yet',
                 subtitle: 'Pull tasks from your backlog into this day.',
               ),

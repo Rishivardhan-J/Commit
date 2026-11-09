@@ -7,6 +7,8 @@ import '../../core/widgets/widgets.dart';
 import '../../data/app_store.dart';
 import '../../data/models.dart';
 import '../../engine/autocomplete_engine.dart';
+import '../../core/widgets/confirm_dialog.dart';
+import '../../core/icons.dart';
 
 class TaskTile extends ConsumerWidget {
   final Task task;
@@ -29,7 +31,12 @@ class TaskTile extends ConsumerWidget {
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
         color: context.scheme.error.withValues(alpha: 0.15),
-        child: Icon(Icons.delete_outline, color: context.scheme.error),
+        child: Icon(AppIcons.trash, color: context.scheme.error),
+      ),
+      confirmDismiss: (_) => confirmDestructive(
+        context,
+        title: 'Delete task?',
+        message: '“${task.title}” will be removed. You can undo right after.',
       ),
       onDismissed: (_) {
         n.deleteTask(task.id);

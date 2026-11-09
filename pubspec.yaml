@@ -30,7 +30,7 @@ dependencies:
   wakelock_plus: ^1.8.2
   audioplayers: ^6.5.0
   workmanager: ^0.10.10
-
+  lucide_icons_flutter: ^4.0.2
 dev_dependencies:
   flutter_test:
     sdk: flutter

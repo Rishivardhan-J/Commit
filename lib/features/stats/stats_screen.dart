@@ -8,6 +8,7 @@ import '../../core/widgets/widgets.dart';
 import '../../data/app_store.dart';
 import '../../engine/badge_engine.dart';
 import '../../engine/streak_engine.dart';
+import '../../core/icons.dart';
 
 class StatsScreen extends ConsumerWidget {
   const StatsScreen({super.key});
@@ -113,7 +114,7 @@ class StatsScreen extends ConsumerWidget {
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(color: cc.surfaceRaised, borderRadius: BorderRadius.circular(12)),
                     child: Column(children: [
-                      Text(b.emoji, style: const TextStyle(fontSize: 26)),
+                      IconTile(b.icon, size: 44),
                       const SizedBox(height: 4),
                       Text(b.name, textAlign: TextAlign.center, style: context.text.labelSmall),
                     ]),
@@ -124,7 +125,7 @@ class StatsScreen extends ConsumerWidget {
         ),
         const SectionTitle('git log'),
         if (log.isEmpty)
-          const CCard(child: EmptyState(emoji: '📜', title: 'No commits yet', subtitle: 'Finish a task, then commit your day.'))
+          const CCard(child: EmptyState(icon: AppIcons.gitCommit, title: 'No commits yet', subtitle: 'Finish a task, then commit your day.'))
         else
           CCard(
             child: Column(children: [

@@ -1,17 +1,20 @@
 import 'dart:async';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/widgets.dart' show IconData;
+import '../../core/icons.dart';
 
 class AmbientSound {
-  final String id, label, emoji;
+  final String id, label;
+  final IconData icon;
   final String? asset;
-  const AmbientSound(this.id, this.label, this.emoji, this.asset);
+  const AmbientSound(this.id, this.label, this.icon, this.asset);
 }
 
 const ambientSounds = [
-  AmbientSound('none', 'Silence', '🔇', null),
-  AmbientSound('brown', 'Brown noise', '🌊', 'sounds/brown.ogg'),
-  AmbientSound('rain', 'Rain', '🌧️', 'sounds/rain.ogg'),
-  AmbientSound('cafe', 'Café hum', '☕', 'sounds/cafe.ogg'),
+  AmbientSound('none', 'Silence', AppIcons.speakerSlash, null),
+  AmbientSound('brown', 'Brown noise', AppIcons.waveform, 'sounds/brown.ogg'),
+  AmbientSound('rain', 'Rain', AppIcons.cloudRain, 'sounds/rain.ogg'),
+  AmbientSound('cafe', 'Café hum', AppIcons.coffee, 'sounds/cafe.ogg'),
 ];
 
 /// Looping ambient sound for focus blocks with soft fades. Best effort: audio failures never
