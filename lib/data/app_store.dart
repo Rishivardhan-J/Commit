@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -300,7 +302,7 @@ class AppNotifier extends Notifier<AppState> {
         return PlatformResult(p.id, label, ok: true, skipped: true, message: _summary(cached));
       }
       try {
-        final snap = await p.fetch(user);
+        final snap = await p.fetch(user).timeout(const Duration(seconds: 20));
         _set(state.copyWith(
           snapshots: {...state.snapshots, p.id: snap},
           syncErrors: {...state.syncErrors}..remove(p.id),
@@ -309,8 +311,10 @@ class AppNotifier extends Notifier<AppState> {
       } on PlatformException catch (e) {
         _set(state.copyWith(syncErrors: {...state.syncErrors, p.id: e.message}));
         return PlatformResult(p.id, label, ok: false, message: e.message);
-      } catch (_) {
-        final msg = 'Could not reach $label';
+      } catch (e) {
+        final msg = e is SocketException || e is TimeoutException || e is http.ClientException
+            ? 'No internet connection'
+            : 'Could not reach $label';
         _set(state.copyWith(syncErrors: {...state.syncErrors, p.id: msg}));
         return PlatformResult(p.id, label, ok: false, message: msg);
       }

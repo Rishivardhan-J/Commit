@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import '../core/utils/day_key.dart';
 import '../data/models.dart';
@@ -19,15 +21,18 @@ Future<AppState> syncState(AppState s, http.Client client, DateTime Function() n
   var out = s;
   for (final e in jobs.entries) {
     try {
-      final snap = await e.key.fetch(e.value);
+      final snap = await e.key.fetch(e.value).timeout(const Duration(seconds: 20));
       out = out.copyWith(
         snapshots: {...out.snapshots, e.key.id: snap},
         syncErrors: {...out.syncErrors}..remove(e.key.id),
       );
     } on PlatformException catch (x) {
       out = out.copyWith(syncErrors: {...out.syncErrors, e.key.id: x.message});
-    } catch (_) {
-      out = out.copyWith(syncErrors: {...out.syncErrors, e.key.id: 'Could not reach ${e.key.id}'});
+    } catch (x) {
+      final msg = x is SocketException || x is TimeoutException || x is http.ClientException
+          ? 'No internet connection'
+          : 'Could not reach ${e.key.id}';
+      out = out.copyWith(syncErrors: {...out.syncErrors, e.key.id: msg});
     }
   }
   final today = dayKey(now());
